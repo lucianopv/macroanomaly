@@ -30,9 +30,11 @@ wdi_df_ori <- read.csv(wdi_csv)
 wdi_df_long <- melt(wdi_df_ori, 
                id.vars = c("Country.Name", "Country.Code", "Indicator.Code",
                            "Indicator.Name"), variable.name = "Year")
+wdi_df_long <- roworder(wdi_df_long,Country.Name,Year,Indicator.Code)
 saveRDS(wdi_df_long,"wdi_df_long")
-wdi_df <- dcast(wdi_df_long, Country.Name + Country.Code + Year ~ Indicator.Code)
 wdi_df[, "Year"] <- substring(wdi_df[, "Year"], 2, 6)
+wdi_df <- dcast(wdi_df_long, Country.Name + Country.Code + Year ~ Indicator.Code)
+
 saveRDS(wdi_df, "WDI_df")
 }
 

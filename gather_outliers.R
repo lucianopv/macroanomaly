@@ -24,5 +24,15 @@ wdi_df_long$Zscore_outliertree_rank <- norm_outliertree_rank$outlier_tree_rank
 saveRDS(wdi_df_long,file="WDI_outliers")
 write.csv(wdi_df_long, file = "WDI_outliers.csv", na = "", row.names = F) 
 
+rm(list=ls())
+wdi_df_long <- readRDS("WDI_outliers")
+
+
 wdi_df_long <- roworder(wdi_df_long,outliertree_rank)
 head(wdi_df_long,20)
+wdi_df_long <- roworder(wdi_df_long,isoforest_rank)
+head(wdi_df_long,20)
+wdi_df_long <- roworder(wdi_df_long,Zscore_rank)
+head(wdi_df_long,20)
+
+
