@@ -66,11 +66,10 @@ wdi_isoforest_cells <- isolation.forest(wdi_df[,-c(2,3)],
 # -------------------------
 # for format where observation is country-year
 outlier_scores <- predict(object=wdi_isoforest_cells, wdi_df[-c(2,3)],type="score")
-wdi_df_outliers_cells <- data.frame(WDI_order = 1:length(outlier_scores),outlier_scores,wdi_df)
-
-wdi_df_outliers_cells <- wdi_df_outliers_cells[with(wdi_df_outliers_cells, order(outlier_scores,decreasing=T)), ]
+wdi_df_outliers_cells <- data.frame(outlier_scores,wdi_df)
+wdi_df_outliers_cells <- roworder(wdi_df_outliers_cells,-outlier_scores)
 wdi_df_outliers_cells$isoforest_rank[!is.na(wdi_df_outliers_cells$outlier_score)]<-1:nrow(wdi_df_outliers_cells)
-saveRDS(wdi_df_outliers_cells[,c("WDI_order","isoforest_rank")],"WDI_isoforest_data")
+saveRDS(wdi_df_outliers_cells[,c("Country.Name","Year","Indicator.Code","isoforest_rank")],"WDI_isoforest_data")
 write.csv(wdi_df_outliers_cells, file = "WDI_isoforest_cells.csv", na = "", row.names = F) 
 rm(outlier_scores)
 #for format where observation is country-indicator 

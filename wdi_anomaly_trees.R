@@ -55,7 +55,7 @@ lst <- outliertree:::list.to.outliers(wdi_outliers_tree$outliers_data)
 # This needs to go from 1 to 17024 
 df_outlierness <- data.frame(WDI_order = 1:nrow(wdi_df), 
                              uses_NA_branch = lst$uses_NA_branch, tree_depth = lst$tree_depth, 
-                             outlier_score = lst$outlier_score, Country.Name=wdi_df$Country.Name,year=wdi_df$Year
+                             outlier_score = lst$outlier_score, Country.Name=wdi_df$Country.Name,Year=wdi_df$Year
                              )
 
 outliers <- as.data.frame(do.call(rbind, lst$suspicous_value))[,-3] ## drop decimals column 
@@ -82,19 +82,17 @@ wdi_df_outliers[1:sum(!is.na(wdi_df_outliers$outlier_score)),"outlier_tree_rank"
 
 
 wdi_df_long <- readRDS("wdi_df_long")
-wdi_df_long$WDI_order <- 1:nrow(wdi_df_long)
-wdi_df_long$year <- as.numeric(substr(wdi_df_long$Year,2,6))
-wdi_df_long$Year <- NULL 
+wdi_df_long$Year <- as.numeric(substr(wdi_df_long$Year,2,5))
 
 wdi_df_outliers$WDI_order <- NULL 
 
 
-wdi_df_outliers_long <- join(wdi_df_long,wdi_df_outliers,on=c("Country.Name","year","Indicator.Code"),how="full",validate="1:1",column="merge",overid=2)
+wdi_df_outliers_long <- join(wdi_df_long,wdi_df_outliers,on=c("Country.Name","Year","Indicator.Code"),how="full",validate="1:1",column="merge",overid=2)
 
 
 
 
-saveRDS(wdi_df_outliers_long[,c("WDI_order","outlier_tree_rank")],"WDI_outliers_trees_data")
+saveRDS(wdi_df_outliers_long[,c("Country.Name","Year","Indicator.Code","outlier_tree_rank")],"WDI_outliers_trees_data")
 
 write.csv(wdi_df_outliers, file = "WDI_outliers_trees.csv", na = "", row.names = F)      
 
