@@ -111,7 +111,9 @@ outliers <- cbind(outliers,WDI_order=rownames(outliers)) ## add WDI index number
 # outliers is a subset of the wide form 
 
 outliers$WDI_order <- as.numeric(outliers$WDI_order)
-wdi_df_outliers <- merge(df_outlierness,outliers,by="WDI_order",all=T) 
+
+wdi_df_outliers <-join(outliers,df_outlierness,on="WDI_order")
+#wdi_df_outliers <- merge(df_outlierness,outliers,by="WDI_order",all=T) 
 wdi_df_outliers$outlier_tree_rank <- NA 
 wdi_df_outliers <- wdi_df_outliers[with(wdi_df_outliers, order(uses_NA_branch, 
                                                                tree_depth, outlier_score)), ]
@@ -121,12 +123,12 @@ wdi_df_outliers$year <- as.numeric(wdi_df_outliers$year)
 
 wdi_df_long <- readRDS("wdi_df_long")
 wdi_df_long$WDI_order <- 1:nrow(wdi_df_long)
-wdi_df_long$year <- as.numeric(wdi_df_long$Year)
+wdi_df_long$year <- as.numeric(substr(wdi_df_long$Year,2,6))
 wdi_df_long$Year <- NULL 
 
 wdi_df_outliers$WDI_order <- NULL 
-
-wdi_df_outliers_long <- merge(wdi_df_long,wdi_df_outliers,by=c("Country.Name","year","Indicator.Code","value"),all.x=T)
+wdi_df_outliers_long <- join(wdi_df_long,wdi_df_outliers,on=c("Country.Name","year","Indicator.Code"),how="full",validate="1:1",column="merge",overid=2)
+#wdi_df_outliers_long <- merge(wdi_df_long,wdi_df_outliers,by=c("Country.Name","year","Indicator.Code","value"),all.x=T)
 saveRDS(wdi_df_outliers_long[,c("WDI_order","outlier_tree_rank")],"WDI_norm_outlier_tree_data")
 
 write.csv(wdi_df_outliers, file = "WDI_outliers_trees.csv", na = "", row.names = F)      

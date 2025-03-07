@@ -9,7 +9,7 @@ library(ggplot2)
 library(collapse)
 
 #setwd("C:/Users/WB147665/OneDrive - WBG/_OD/WDI_ANOMALY")
-setwd("E:/David/outlier detection")
+setwd("D:/David/outlier detection")
 
 # Download the WDI data
 # ---------------------
