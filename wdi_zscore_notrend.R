@@ -2,6 +2,7 @@
 # Anomaly detection based on outlier trees 
 # ------------------------------------------------------------------------------
 
+
 library(reshape2)
 library(rlist)
 library(ggplot2)
@@ -46,32 +47,13 @@ wdi_df <- readRDS("wdi_df")
 
 # Standardize wdi 
 # ---------------------
+wdi_df_norm_mean <- fmean(wdi_df[,4:1499],g=wdi_df[,2],TRA=1)
+wdi_df_norm_sd <- fsd(wdi_df[,4:1499],g=wdi_df[,2],TRA=1)
+wdi_df_norm <- cbind(wdi_df[,1:3],(wdi_df[,4:1499]-wdi_df_norm_mean)/wdi_df_norm_sd)
 
-wdi_df_norm <- fscale(wdi_df[,4:1499],g=wdi_df[,2])
-wdi_df_norm <- cbind(wdi_df[1:3],wdi_df_norm)
+#wdi_df_norm_check <- fmean(wdi_df_norm[,4:1499],g=wdi_df_norm[,2],TRA=1) 
+#wdi_df_norm_check2 <- fsd(wdi_df_norm[,4:1499],g=wdi_df_norm[,2],TRA=1) 
 
-#wdi_df_norm_mean <- fmean(wdi_df[,4:1499],g=wdi_df[,2],TRA=1)
-#wdi_df_norm_sd <- fsd(wdi_df[,4:1499],g=wdi_df[,2],TRA=1)
-#wdi_df_norm <- cbind(wdi_df[,1:3],(wdi_df[,4:1499]-wdi_df_norm_mean)/wdi_df_norm_sd)
-
-
-# apply smoother to each country and column
-wdi_df_norm$t <- as.integer(wdi_df_norm$Year)-1959
-
-detrend <- function(Y=Y,t=t) {
-  Nnonmiss <- fsum(is.finite(Y))
-  output <- rep(NA,length(Y)) 
-    if (Nnonmiss>0) {
-  S=supsmu(x=t, y=Y)  
-  Yhat <- unlist2d(S$y)
-  output[is.finite(Y)] <- Y[is.finite(Y)]-Yhat
-  }
-  return(output)
-}
-
-wdi_df_norm <- cbind(wdi_df_norm[,1:3],BY(x=wdi_df_norm[4:1499],detrend,g=wdi_df_norm[,"Country.Code"],t=wdi_df_norm[,1500]))
-saveRDS(wdi_df_norm,"wdi_df_norm")
-  
 wdi_df_norm_long <- melt(wdi_df_norm, 
      id.vars = c("Country.Name", "Country.Code",
                  "Year"), variable.name = "Indicator.Code")
@@ -79,70 +61,29 @@ colnames(wdi_df_norm_long)[5] <- "Zscore"
 wdi_df_norm_long$Zscore[abs(wdi_df_norm_long$Zscore)==Inf] <- NA 
 saveRDS(wdi_df_norm_long,"wdi_df_norm_long")
 
-rm(list=ls())
-wdi_df_norm_long <- readRDS("wdi_df_norm_long")
-
-#Remove all country-indicators with no non-missing values of Z score 
-#Nnonmiss <- fsum(!is.na(wdi_df_norm_long[,"Zscore"]),g=wdi_df_norm_long[,c("Country.Code","Indicator.Code")],TRA=1)
-#wdi_df_norm_long_2 <- wdi_df_norm_long[(Nnonmiss>=1),]
-
-# Detrend Zscores 
-
-#wdi_df_norm_long_2$t <- as.integer(wdi_df_norm_long_2$Year)-1959
-#timetrend <- BY(wdi_df_norm_long_2[,"Zscore"],g=wdi_df_norm_long_2[,c("Country.Code","Indicator.Code")],FUN=supsmu,x=wdi_df_norm_long_2$t,y=wdi_df_norm_long_2$Zscore)
-#timetrend_df_y <- unlist2d(get_elem(timetrend,".y",regex=TRUE))
-#timetrend_df_y$Country.Code=substr(timetrend_df_y$.id,1,3)
-#timetrend_df_y$Indicator.Code=substring(timetrend_df_y$.id,5,)
-#timetrend_df_y$Indicator.Code=sub(".y","",timetrend_df_y$Indicator.Code)
-#timetrend_df_y$.id <- NULL 
-#timetrend_df_y<- pivot(timetrend_df_y,how="l",id=c("Indicator.Code","Country.Code"),names=list("point","y"))
-
-#timetrend_df_x <- unlist2d(get_elem(timetrend,".x",regex=TRUE))
-#timetrend_df_x$Country.Code=substr(timetrend_df_x$.id,1,3)
-#timetrend_df_x$Indicator.Code=substring(timetrend_df_x$.id,5,)
-#timetrend_df_x$Indicator.Code=sub(".x","",timetrend_df_x$Indicator.Code)
-#timetrend_df_x$.id <- NULL 
-#timetrend_df_x<- pivot(timetrend_df_x,how="l",id=c("Indicator.Code","Country.Code"),names=list("point","t"))
-#timetrend_df <- cbind(timetrend_df_y,"t"=timetrend_df_x[,"t"])
-#timetrend_df <- fsubset(timetrend_df,!is.na(timetrend_df[,"t"]))
-#wdi_df_norm_long_2 <- join(wdi_df_norm_long_2,timetrend_df,on=c("Country.Code","Indicator.Code","t"),validate="1:1")
-#wdi_df_norm_long_2$Zscore2 <- wdi_df_norm_long_2$Zscore-wdi_df_norm_long_2$y
-#wdi_df_norm_long_2[,c("point","y","t","Zscore")]<- NULL 
-
-
-# Estimate isolation  forest on normalized detrended values 
-wdi_df_norm_long$Year <- as.numeric(wdi_df_norm_long$Year)
-model <- isolation.forest(wdi_df_norm_long[,-1], ndim=1, ntrees=10, nthreads=2)
-scores <- predict(model, wdi_df_norm_long[,-1], type="score")
-wdi_df_norm_long <- cbind(wdi_df_norm_long,scores)
-wdi_df_norm_long$norm_isoforest_rank <- NA 
-wdi_df_norm_long <- roworder(wdi_df_norm_long,-scores)
-wdi_df_norm_long[1:sum(!is.na(wdi_df_norm_long$scores)),"norm_isoforest_rank"] <- 1:sum(!is.na(wdi_df_norm_long$scores))
-
-#Generate rank variable based on descending order of Zscore 
 wdi_df_norm_long$Zscore_rank <- NA 
 wdi_df_norm_long$absZscore <- abs(wdi_df_norm_long$Zscore)
 wdi_df_norm_long <- roworder(wdi_df_norm_long,-absZscore)
 wdi_df_norm_long[1:sum(!is.na(wdi_df_norm_long$"Zscore")),"Zscore_rank"] <- 1:sum(!is.na(wdi_df_norm_long$"Zscore"))
 
+# Estimate isolation  forest on the standardized values 
+wdi_df_norm_long$Year <- as.numeric(wdi_df_norm_long$Year)
+model <- isolation.forest(wdi_df_norm_long[,-1], ndim=1, ntrees=10, nthreads=1)
+scores <- predict(model, wdi_df_norm_long[,-1], type="score")
+wdi_df_norm_long <- cbind(wdi_df_norm_long,scores)
+wdi_df_norm_long$norm_isoforest_rank <- NA 
+wdi_df_norm_long <- roworder(wdi_df_norm_long,-scores)
+wdi_df_norm_long[1:sum(!is.na(wdi_df_norm_long$scores)),"norm_isoforest_rank"] <- 1:sum(!is.na(wdi_df_norm_long$scores))
+saveRDS(wdi_df_norm_long[,c("Country.Name","Year","Indicator.Code","Zscore_rank","norm_isoforest_rank")],"norm_zscore_isoforest")
+
+write.csv(wdi_df_norm_long, file = "WDI_outliers_zscore_isoforest.csv", na = "", row.names = F)                         
 
 
 
-
-saveRDS(wdi_df_norm_long[,c("Country.Name","Year","Indicator.Code","Zscore","Zscore_rank","norm_isoforest_rank")],"norm_Zscore_isoforest")
-
-write.csv(wdi_df_norm_long, file = "WDI_outliers_Zscore_isoforest.csv", na = "", row.names = F)                         
-
-# stopped here 
-# Now try using a outlier tree on the standardized and values 
-
-rm(list=ls())
-wdi_df_norm <- readRDS("wdi_df_norm")
-
-
+# Now try using a outlier tree on the standardized values 
 
 if(!file.exists("wdi_outliers_tree_norm_object")) {
-wdi_outliers_tree_norm  <- outlier.tree(wdi_df_norm, save_outliers = TRUE, cols_ignore="Year", nthreads = 2)
+wdi_outliers_tree_norm  <- outlier.tree(wdi_df_norm, save_outliers = TRUE, cols_ignore="Year", nthreads = 1)
 saveRDS(wdi_outliers_tree_norm, file = "wdi_outliers_tree_norm_object")
 } 
 
@@ -151,9 +92,9 @@ saveRDS(wdi_outliers_tree_norm, file = "wdi_outliers_tree_norm_object")
 # -------------------------
 wdi_outliers_tree_norm <- readRDS(file = "wdi_outliers_tree_norm_object")
 lst <- outliertree:::list.to.outliers(wdi_outliers_tree_norm$outliers_data)
-df_outlierness <- data.frame(WDI_order = 1:nrow(wdi_df_norm), 
+df_outlierness <- data.frame(WDI_order = 1:nrow(wdi_df), 
                              uses_NA_branch = lst$uses_NA_branch, tree_depth = lst$tree_depth, 
-                             outlier_score = lst$outlier_score, Country.Name=wdi_df_norm$Country.Name,Year=wdi_df_norm$Year
+                             outlier_score = lst$outlier_score, Country.Name=wdi_df$Country.Name,Year=wdi_df$Year
 )
 
 outliers <- as.data.frame(do.call(rbind, lst$suspicous_value))[,-3] ## drop decimals column 
