@@ -42,18 +42,51 @@ saveRDS(wdi_df, "WDI_df")
 #start here 
 rm(list=ls())
 wdi_df <- readRDS("wdi_df")
-#wdi_df[, "Year"] <- substring(wdi_df[, "Year"], 2, 6)
+
+
 
 # Standardize wdi 
 # ---------------------
 
-wdi_df_norm <- fscale(wdi_df[,4:1499],g=wdi_df[,2])
-wdi_df_norm <- cbind(wdi_df[1:3],wdi_df_norm)
 
-#wdi_df_norm_mean <- fmean(wdi_df[,4:1499],g=wdi_df[,2],TRA=1)
-#wdi_df_norm_sd <- fsd(wdi_df[,4:1499],g=wdi_df[,2],TRA=1)
-#wdi_df_norm <- cbind(wdi_df[,1:3],(wdi_df[,4:1499]-wdi_df_norm_mean)/wdi_df_norm_sd)
+# use robust scaling  method for normalization, subtract median and divide by IQR  
+#wdi_df_med <- fmedian(wdi_df[,4:1499],g=wdi_df[,2],TRA=1)
+#wdi_df_p25 <- fnth(wdi_df[,4:1499],n=0.25,g=wdi_df[,2],TRA=1) 
+#wdi_df_p75 <- fnth(wdi_df[,4:1499],n=0.75,g=wdi_df[,2],TRA=1) 
+#rm(list="wdi_df_med","wdi_df_p25","wdi_df_p75")
 
+# a robust scaling method that relies on median absolute deviation from the median
+#wdi_df_med <- fmedian(wdi_df[,4:1499],g=wdi_df[,2],TRA=1)
+#wdi_df_mad <- abs(wdi_df[,4:1499]-wdi_df_med)
+#wdi_df_mad <- fmedian(wdi_df_mad,g=wdi_df[,2],TRA=1)
+#wdi_df_norm <- (wdi_df[,4:1499]-wdi_df_med)/wdi_df_mad 
+#rm(list="wdi_df_mad","wdi_df_med")
+#wdi_df_norm <- replace(wdi_df_norm,wdi_df_norm==Inf,NA)
+
+#Leave one out mean and SD 
+#wdi_df_mean <- fmean(wdi_df[,4:1499],g=wdi_df[,2],TRA=1)
+#wdi_df_count <- fnobs(wdi_df[,4:1499],g=wdi_df[,2],TRA=1)
+#wdi_df_var <- fvar(wdi_df[,4:1499],g=wdi_df[,2],TRA=1)
+
+#wdi_df_loomean <- (wdi_df_mean*wdi_df_count-wdi_df[,4:1499])/(wdi_df_count-1)
+#wdi_df_loosd <- ((wdi_df_var-(wdi_df[,4:1499]-wdi_df_mean)^2)*wdi_df_count/(wdi_df_count-1))^0.5 
+
+#wdi_df_norm <- (wdi_df[,4:1499]-wdi_df_loomean)/(wdi_df_loosd)
+#wdi_df_norm <- replace(wdi_df_norm,wdi_df_loosd<1e-13,NA)
+
+# for constant series, set standardized values to NA manually (fscale has a bug that will divide by a very small sd)
+# This can create  variation in the Z scoress when none actually exist. 
+wdi_df_norm <- fscale(wdi_df[,4:1499],g=wdi_df[,2]) # Simple normalization 
+wdi_df_norm_sd <- fsd(wdi_df[,4:1499],g=wdi_df[,2],TRA=1)
+wdi_df_norm <- replace(wdi_df_norm,wdi_df_norm_sd<1e-13,NA)
+
+
+
+
+
+#wdi_df_norm <- (wdi_df[,4:1499]-wdi_df_norm_mean)/wdi_df_norm_sd
+wdi_df_norm <- cbind(wdi_df[1:3],wdi_df_norm) 
+saveRDS(wdi_df_norm,"wdi_df_norm_nosmooth")
 
 # apply smoother to each country and column
 wdi_df_norm$t <- as.integer(wdi_df_norm$Year)-1959
@@ -69,6 +102,7 @@ detrend <- function(Y=Y,t=t) {
   return(output)
 }
 
+
 wdi_df_norm <- cbind(wdi_df_norm[,1:3],BY(x=wdi_df_norm[4:1499],detrend,g=wdi_df_norm[,"Country.Code"],t=wdi_df_norm[,1500]))
 saveRDS(wdi_df_norm,"wdi_df_norm")
   
@@ -78,36 +112,11 @@ wdi_df_norm_long <- melt(wdi_df_norm,
 colnames(wdi_df_norm_long)[5] <- "Zscore"
 wdi_df_norm_long$Zscore[abs(wdi_df_norm_long$Zscore)==Inf] <- NA 
 saveRDS(wdi_df_norm_long,"wdi_df_norm_long")
+#fsubset(wdi_df_norm_long,Indicator.Code=="ER.H2O.INTR.K3" & Country.Code=="MEA")
+
 
 rm(list=ls())
 wdi_df_norm_long <- readRDS("wdi_df_norm_long")
-
-#Remove all country-indicators with no non-missing values of Z score 
-#Nnonmiss <- fsum(!is.na(wdi_df_norm_long[,"Zscore"]),g=wdi_df_norm_long[,c("Country.Code","Indicator.Code")],TRA=1)
-#wdi_df_norm_long_2 <- wdi_df_norm_long[(Nnonmiss>=1),]
-
-# Detrend Zscores 
-
-#wdi_df_norm_long_2$t <- as.integer(wdi_df_norm_long_2$Year)-1959
-#timetrend <- BY(wdi_df_norm_long_2[,"Zscore"],g=wdi_df_norm_long_2[,c("Country.Code","Indicator.Code")],FUN=supsmu,x=wdi_df_norm_long_2$t,y=wdi_df_norm_long_2$Zscore)
-#timetrend_df_y <- unlist2d(get_elem(timetrend,".y",regex=TRUE))
-#timetrend_df_y$Country.Code=substr(timetrend_df_y$.id,1,3)
-#timetrend_df_y$Indicator.Code=substring(timetrend_df_y$.id,5,)
-#timetrend_df_y$Indicator.Code=sub(".y","",timetrend_df_y$Indicator.Code)
-#timetrend_df_y$.id <- NULL 
-#timetrend_df_y<- pivot(timetrend_df_y,how="l",id=c("Indicator.Code","Country.Code"),names=list("point","y"))
-
-#timetrend_df_x <- unlist2d(get_elem(timetrend,".x",regex=TRUE))
-#timetrend_df_x$Country.Code=substr(timetrend_df_x$.id,1,3)
-#timetrend_df_x$Indicator.Code=substring(timetrend_df_x$.id,5,)
-#timetrend_df_x$Indicator.Code=sub(".x","",timetrend_df_x$Indicator.Code)
-#timetrend_df_x$.id <- NULL 
-#timetrend_df_x<- pivot(timetrend_df_x,how="l",id=c("Indicator.Code","Country.Code"),names=list("point","t"))
-#timetrend_df <- cbind(timetrend_df_y,"t"=timetrend_df_x[,"t"])
-#timetrend_df <- fsubset(timetrend_df,!is.na(timetrend_df[,"t"]))
-#wdi_df_norm_long_2 <- join(wdi_df_norm_long_2,timetrend_df,on=c("Country.Code","Indicator.Code","t"),validate="1:1")
-#wdi_df_norm_long_2$Zscore2 <- wdi_df_norm_long_2$Zscore-wdi_df_norm_long_2$y
-#wdi_df_norm_long_2[,c("point","y","t","Zscore")]<- NULL 
 
 
 # Estimate isolation  forest on normalized detrended values 
@@ -141,10 +150,10 @@ wdi_df_norm <- readRDS("wdi_df_norm")
 
 
 
-if(!file.exists("wdi_outliers_tree_norm_object")) {
+#if(!file.exists("wdi_outliers_tree_norm_object")) {
 wdi_outliers_tree_norm  <- outlier.tree(wdi_df_norm, save_outliers = TRUE, cols_ignore="Year", nthreads = 2)
 saveRDS(wdi_outliers_tree_norm, file = "wdi_outliers_tree_norm_object")
-} 
+#} 
 
 
 # Look at detected outliers
@@ -164,7 +173,6 @@ outliers$column <- NULL
 outliers <- cbind(outliers,WDI_order=rownames(outliers)) ## add WDI index numbers which are stored in row names 
 
 # outliers is a subset of the wide form 
-
 outliers$WDI_order <- as.numeric(outliers$WDI_order)
 
 wdi_df_outliers <-join(outliers,df_outlierness,on="WDI_order")
@@ -178,7 +186,6 @@ wdi_df_outliers$Year <- as.numeric(wdi_df_outliers$Year)
 
 wdi_df_long <- readRDS("wdi_df_long")
 wdi_df_long$Year <- as.numeric(substr(wdi_df_long$Year,2,6))
-
 
 wdi_df_outliers$WDI_order <- NULL 
 wdi_df_outliers_long <- join(wdi_df_long,wdi_df_outliers,on=c("Country.Name","Year","Indicator.Code"),how="full",validate="1:1",column="merge",overid=2)

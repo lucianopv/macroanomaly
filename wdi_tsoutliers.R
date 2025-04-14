@@ -14,7 +14,6 @@ tsoutliers <- BY(wdi_df_norm_long_2[,"Zscore"],g=wdi_df_norm_long_2[,c("Country.
 saveRDS(tsoutliers,"tsoutliers")
 tsoutliers <- readRDS("tsoutliers")
  
-
 indices <- unlist2d(get_elem(tsoutliers,".index",regex=TRUE))
 
 indices$Country.Code=substr(indices$.id,1,3)
@@ -43,6 +42,7 @@ wdi_tsoutliers <- wdi_tsoutliers[!is.na(wdi_tsoutliers$outlier),]
 wdi_tsoutliers$magnitude <- abs(wdi_tsoutliers$Zscore-wdi_tsoutliers$replacement)
 wdi_tsoutliers <- roworder(wdi_tsoutliers,-magnitude)
 wdi_tsoutliers$tsoutlier_rank <- seq(1:nrow(wdi_tsoutliers))
+wdi_tsoutliers <- fselect(wdi_tsoutliers,Country.Name,Year,Indicator.Code,magnitude,tsoutlier_rank)
 head(wdi_tsoutliers,30)
 
 saveRDS(wdi_tsoutliers,"WDI_tsoutliers")
