@@ -39,6 +39,8 @@ wdi_df[, "Year"] <- substring(wdi_df[, "Year"], 2, 6)
 saveRDS(wdi_df, "WDI_df")
 }
 
+
+
 #start here 
 rm(list=ls())
 wdi_df <- readRDS("wdi_df")
@@ -91,7 +93,7 @@ saveRDS(wdi_df_norm,"wdi_df_norm_nosmooth")
 # apply smoother to each country and column
 wdi_df_norm$t <- as.integer(wdi_df_norm$Year)-1959
 
-detrend <- function(Y=Y,t=t) {
+detrend2 <- function(Y=Y,t=t) {
   Nnonmiss <- fsum(is.finite(Y))
   output <- rep(NA,length(Y)) 
     if (Nnonmiss>0) {
@@ -103,10 +105,10 @@ detrend <- function(Y=Y,t=t) {
 }
 
 
-wdi_df_norm <- cbind(wdi_df_norm[,1:3],BY(x=wdi_df_norm[4:1499],detrend,g=wdi_df_norm[,"Country.Code"],t=wdi_df_norm[,1500]))
+wdi_df_norm <- cbind(wdi_df_norm[,1:3],BY(x=wdi_df_norm[4:1499],detrend2,g=wdi_df_norm[,"Country.Code"],t=wdi_df_norm[,1500]))
 saveRDS(wdi_df_norm,"wdi_df_norm")
   
-wdi_df_norm_long <- melt(wdi_df_norm, 
+wdi_df_norm_long <- reshape2::melt(wdi_df_norm, 
      id.vars = c("Country.Name", "Country.Code",
                  "Year"), variable.name = "Indicator.Code")
 colnames(wdi_df_norm_long)[5] <- "Zscore"
