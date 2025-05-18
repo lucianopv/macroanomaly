@@ -1,144 +1,3 @@
-#' Prepare format using the csv file downloaded from WorldBank
-#'
-#' @param .data The data frame to be prepared obtained directly from the CSV file
-#' of the World Bank.
-#' @returns A data frame in a tidy format with the following columns:
-#' \itemize{
-#' \item Country.Name
-#' \item Country.Code
-#' \item Year
-#' \item Indicator Code as columns ...
-#'}
-#'
-prepare_csv <- function(.data){
-  .data |>
-    pivot(
-      ids = c("Country.Name", "Country.Code", "Indicator.Code", "Indicator.Name"),
-      names = list(variable = "Year")
-    ) |>
-    fmutate(
-      Length = nchar(as.character(Year))
-    ) -> .data
-
-  if(allv(.data$Length, 5)){
-    .data |>
-      fmutate(
-        Year = as.integer(substr(Year, 2, 6))
-      ) |>
-      fselect(-Length, -Indicator.Name) -> .data
-  } else {
-    warning("`Year` column is not in the expected format (e.g., X1980)")
-  }
-
-  .data |>
-    pivot(
-      how = "wider",
-      ids = c("Country.Name", "Country.Code", "Year"),
-      values = c("value"),
-      names = "Indicator.Code"
-    ) -> .data
-
-  return(.data)
-}
-
-#' Function to download and prepare CSV file from the World Bank
-#'
-#' @param .path The path where the CSV file will be downloaded. Default is the temporary directory.
-#' @param .additional A logical value indicating whether to download additional files.
-#' The additional files contain the information about the countries and series. Default is FALSE.
-#' \itemize{
-#' \item Series information
-#' \item Series by year information
-#' \item Country information
-#' \item Country by series information
-#' }
-#' @param .prepare A logical value indicating whether to prepare the data in wide format
-#' with the following columns:
-#' \itemize{
-#' \item Country.Name
-#' \item Country.Code
-#' \item Year
-#' \item Indicator Code as columns ...
-#' }
-#' @returns Returns either a data frame in a tidy format (\code{.prepare = TRUE}),
-#' a data frame with the data directory (\code{.prepare = FALSE}), or
-#' a list with the data (either tidy or not) and additional data.frame with the
-#' information provided in \code{.additional = TRUE}.
-#' @export
-wdi_download <- function(.path = tempdir(), .prepare = TRUE, .additional = FALSE){
-  # Url to download the CSV files
-  url <- "https://databank.worldbank.org/data/download/WDI_CSV.zip"
-
-  # Name of file with the data
-  .wdi_csv <- "WDICSV.csv"
-  .wdi_zip <- "wdi.zip"
-
-  # Name of additional files:
-  wdi_additional <- c("Series" = "WDIseries.csv",
-                      "Series-time" = "WDIseries-time.csv",
-                      "Country" = "WDIcountry.csv",
-                      "Country-series" = "WDIcountry-series.csv")
-
-  # Check if the file already exists
-  .path_csv <- file.path(.path, .wdi_csv)
-  if(!file.exists(.path_csv)) {
-    print("Checking if file exists and downloading...")
-    download.file(url, file.path(.path, .wdi_zip) , mode = "wb")
-    unzip(file.path(.path, .wdi_zip), exdir = .path)
-    ## unlink(file.path(.path, .wdi_zip))
-  } else {
-    print("File already exists. No need to download.")
-  }
-
-  .data <- read.csv(.path_csv, stringsAsFactors = FALSE)
-
-  # Check if data wants to be prepared
-  if (.prepare) {
-    # Check if the data is in the expected format
-    if (all(c("Country.Name", "Country.Code", "Indicator.Code", "Indicator.Name") %in% colnames(.data))) {
-      .data <- prepare_csv(.data)
-    } else {
-      warning("The data is not in the expected format. Please check the CSV file.")
-    }
-  }
-
-
-  if (.additional){
-    # create empty list for results
-    .res <- list("Data" = .data)
-
-    # Check and the files exist and read them
-    for (i in seq_along(wdi_additional)) {
-      if (!file.exists(file.path(.path, wdi_additional[i]))) {
-        warning("File ", wdi_additional[i], " not found. Downloading again...")
-        tryCatch({
-          download.file(url, file.path(.path, .wdi_zip), mode = "wb")
-        }, error = function(e) {
-          warning("Error downloading file: ", e$message)
-        })
-        tryCatch({
-          unzip(file.path(.path, .wdi_zip), files = wdi_additional[i])
-        }, error = function(e) {
-          warning("Error unzipping file: ", e$message)
-        })
-        unlink(file.path(.path, .wdi_zip))
-      }
-      tryCatch({
-        .data_tmp <- read.csv(file.path(.path, wdi_additional[i]), stringsAsFactors = FALSE)
-      }, error = function(e) {
-        warning("Error reading file ", wdi_additional[i], ": ", e$message)
-        warning("Try to download file manually or avoid including additional files")
-      })
-
-      # Include additional files in the list
-      .res[[names(wdi_additional)[i]]] <- .data_tmp
-    }
-    return(.res)
-  } else (
-    return(.data)
-  )
-}
-
 #' Detrend a time series using a smoothing spline
 #'
 #' This function detrends a time series using a smoothing spline.
@@ -168,7 +27,7 @@ detrend <- function(.data,.year) {
 #' @param .country_col A character vector specifying the name(s) of the country
 #' identifiers.
 #' @param .year_col A character vector specifying the name(s) of the time
-#' identifiers.
+#' identifiers. See \code{tsibble::as_tsibble()} for more details.
 #' @param .indicator_col A character vector specifying the name(s) of the indicator
 #' identifiers.
 #' @param .frequency A character vector specifying the frequency of the time series.
@@ -193,7 +52,7 @@ convert_to_tsibble <- function(.data,
   }
 
   # Check if only one indicator
-  if (unique(.data[[.indicator_col]]) > 1) {
+  if (length(unique(.data[[.indicator_col]])) > 1) {
     .keys <- c(.country_col, .indicator_col)
   } else {
     .keys <- .country_col
@@ -236,7 +95,8 @@ convert_to_tsibble <- function(.data,
 #'
 #' @importFrom imputeTS na_interpolation na_kalman na_mean na_locf na_ma na_seadec na_random
 #' @importFrom tsibble as_tsibble group_by_key
-#' @importFrom collapse fmutate fselect
+#' @importFrom collapse fmutate fselect ftransform
+#' @importFrom rlang sym expr
 #' @export
 impute_missing <- function(.data,
                            .value_col,
@@ -285,13 +145,17 @@ impute_missing <- function(.data,
             paste(.missing_data[[.country_col[1]]], collapse = ", "), ".\n Consider excluding these countries.")
   }
 
+  suppressWarnings({
   # Impute missing values using the specified method
   .data <- .data |>
+    ftransform(
+      Imputed = is.na(eval(sym(expr(!!.value_col))))
+  ) |>
     tsibble::group_by_key() |>
     fmutate(
-      Imputed = ifelse(is.na(x), TRUE, FALSE),
       across(.value_col,
                    \(x) get(.method)(x, ...)))
+  })
 
   return(.data)
 }
@@ -375,7 +239,7 @@ decompose_tsibble <- function(.data,
                                .season = NULL,
                                .trend = TRUE,
                                .frequency = "yearly",
-                              .imputed = NULL) {
+                               .imputed = NULL) {
   # Check if the required columns exist in the data
   if (!all(c(.value_col) %in% colnames(.data))) {
     stop("The specified columns do not exist in the data.")
@@ -399,6 +263,11 @@ decompose_tsibble <- function(.data,
     stop("The data contains gaps. Consider filling them before decomposition and using .impute = TRUE")
   }
 
+  # Check for missing values in the data
+  if (any(is.na(.data[[.value_col]]))) {
+    stop("The data contains missing values. Consider filling them before decomposition or using .impute = TRUE with prefered method")
+  }
+
   # Perform decomposition using the STL method
   .data |>
     fabletools::model(feasts::STL(formula)) -> .data_decomposed
@@ -415,102 +284,171 @@ decompose_tsibble <- function(.data,
 #' This function normalizes and detrends the series for each country.
 #'
 #' @param .data A data frame containing the data to be normalized and detrended.
-#' @param .cols A character vector of column names to be normalized and detrended,
-#' can be integers refering to indexes of the columns (e.g., 1:10), or the names
-#' of the columns (e.g., c("AG.CON.FERT.PT.ZS", "DC.DAC.AUTL.CD")).
+#' @param .value_col A character with the name of the column to be normalized and detrended,
+#' can be integer refering to indexes of the columns (e.g., 8), or the name
+#' of the column (e.g., "AG.CON.FERT.PT.ZS" or "value").
 #' @param .country_col A character vector specifying the name(s) of the country
 #' identifiers
 #' @param .year_col A character vector specifying the name of the year column.
+#' @param .indicator_col A character vector specifying the name of the indicator
+#' identifiers.
+#' @param .frequency A character vector specifying the frequency of the time series.
+#' Default is "yearly". The other values are "monthly" and "quarterly".
 #' @param .detrend A logical value indicating whether to detrend the data. The
-#' \code{supsmu} function is used for smoothing. Default is TRUE.
+#' \code{STL} function from the \code{feasts} is used for smoothing. Default is TRUE.
+#' @param .season A numeric value specifying the seasonality to be used. Default is NULL.
+#' If NULL, the function will use the default seasonality of the data.
+#' @param .impute A logical value indicating whether to impute missing values using the
+#' specified method from \code{imputeTS}. Default is TRUE.
+#' @param .method A character vector specifying the imputation method to be used.
+#' The default is \code{na_interpolation}. Other options are: na_kalman, na_mean,
+#' na_locf, na_ma, na_seadec, na_random. Check \code{imputeTS} for more details.
 #' @param .long_format A logical value indicating whether to return the data in long format.
 #' Default is TRUE.
+#' @param .keep_decomp A logical value indicating whether to keep the decomposition
+#' components in the output. Default is FALSE.
 #' @return A data frame with the normalized and detrended data.
 #'
 #'
-#' @importFrom collapse fscale fsd fmutate fselect BY pivot
+#' @importFrom collapse fscale fsd fmutate fselect BY pivot frename ftransform get_vars
+#' @importFrom imputeTS na_interpolation na_kalman na_mean na_locf na_ma na_seadec na_random
+#' @importFrom tsibble has_gaps fill_gaps
 #' @export
 normalize <- function(.data,
-                          .cols,
+                          .value_col,
                           .country_col = c("Country.Code", "Country.Name"),
                           .year_col = "Year",
+                          .indicator_col = "Indicator.Code",
+                          .frequency = "yearly",
                           .detrend = TRUE,
-                          .long_format = TRUE) {
+                          .season = NULL,
+                          .impute = TRUE,
+                          .method = "na_interpolation",
+                          .long_format = TRUE,
+                          .keep_decomp = FALSE,
+                          ...) {
   # Check if the required columns exist in the data
-  if (!all(c(.country_col, .year_col) %in% colnames(.data))) {
+  if (!all(c(.country_col, .year_col, .indicator_col) %in% colnames(.data))) {
     stop("The specified columns do not exist in the data.")
   }
 
-    # Check the input of columns, if numbers obtain columns and check if they exist
-  if(is.numeric(.cols)) {
-    if (all(.cols %in% seq_len(ncol(.data)))) {
-      .cols <- colnames(.data)[.cols]
-    } else {
-      stop("The specified columns do not exist in the data.")
-    }
-  } else if (all(.cols %in% colnames(.data))) {
-    # Do nothing, .cols is already in the correct format
+  # Check if the value column exists
+  if (!.value_col %in% colnames(.data)) {
+    stop("The specified value column does not exist in the data.")
+  }
+
+  # Check the input of columns, if numbers obtain columns and check if they exist
+  if(length(.value_col) > 1) {
+    warning("Multiple columns specified to normalize. Only the first one will be used. Make sure the data is long format.")
+    .value_col <- .value_col[1]
+  }
+
+  # Check if the value column is numeric
+  if(!is.numeric(.data[[.value_col]])) {
+      warning("The column specified is not numeric. Converting to numeric.")
+      .data[[.value_col]] <- as.numeric(.data[[.value_col]])
+  }
+
+  # Check if data is tsibble, if not convert to tsibble
+  if (!class(.data) %in% c("tbl_ts", "tbl_df")) {
+    .data <- convert_to_tsibble(.data,
+                      .country_col = .country_col,
+                      .year_col = .year_col,
+                      .indicator_col = .indicator_col,
+                      .frequency = .frequency,
+                      .long_format = TRUE)
+  }
+
+  # Check the tsibble for gaps, if so, correct them
+  .gaps <- tsibble::has_gaps(.data)
+  if(any(.gaps$.gaps)) {
+    warning("The data contains gaps. Will include missing period and impute them.")
+    .data <- tsibble::fill_gaps(.data)
+  }
+
+  # Try to impute missing values using the specified method
+  if (.impute & !is.null(.method)) {
+    .data <- impute_missing(.data,
+                             .value_col = .value_col,
+                             .country_col = .country_col,
+                             .year_col = .year_col,
+                             .indicator_col = .indicator_col,
+                             .method = .method,
+                             ...)
+  } else if (.impute & is.null(.method)) {
+    warning("The imputation method is not specified. No imputation will be performed.")
   } else {
-    stop("The specified columns do not exist in the data.")
+    warning("No imputation will be performed.")
   }
 
-  # Check that the column is a numeric column
-  if (!all(sapply(.data[, .cols], is.numeric))) {
-    stop("All specified columns must be numeric.")
-  }
-
-  if(length(.cols) == 0) {
-    stop("No columns specified for normalization.")
-  }
-
-  if (length(.year_col) != 1) {
-    stop("Only one country and year column can be specified.")
-  }
-
-  # Identifiers for country and year
-  .ids_names <- c(.country_col, .year_col)
-  .ids <- .data[, .ids_names]
-
-  # Year column
-  .year_data <- as.numeric(.data[[.year_col]])
-
-  # Subset data
-  .data <- .data[, c(.cols)]
-
-  # Normalize the data
-  .data_norm <- fscale(.data, g = .ids[,.country_col])
-  .data_norm_sd <- fsd(.data, g = .ids[,.country_col], TRA = 1)
-  .data_norm <- replace(.data_norm, .data_norm_sd<1e-13, NA)
-
-  # Check if detrend is TRUE
-  if (!is.logical(.detrend)) {
-    stop("The detrend argument must be a logical value (TRUE or FALSE).")
-  }
-
-  # Apply detrend if specified
+  # Detrend the data using the decompose_tsibble function
   if (.detrend) {
-    # Identify first year
-    first_year <- min(.year_data, na.rm = TRUE) - 1
-
-    # Create a new column for time
-    .time_data <- as.integer(.year_data) - first_year
-
-    # Detrend the data using the detrend function
-    .data <- cbind(.ids, BY(x = .data_norm, detrend, g = .ids[,.country_col], .year = .time_data))
+    .data_decomp <- decompose_tsibble(.data,
+                                .value_col = .value_col,
+                                .season = .season,
+                                .trend = TRUE,
+                                .frequency = .frequency,
+                                .imputed = .impute)
   } else {
-    # If not detrending, just bind the ids
-    .data <- cbind(.ids, .data_norm)
+    # Copy .value_col as Zscore
+    .data[["Zscore"]] <- .data[[.value_col]]
   }
 
-  # Check if long format is TRUE
-  if (.long_format){
-    # Convert to long format
+  # If imputation, include the column Imputed
+  if (.impute & .detrend) {
+    .data <- .data_decomp |>
+      ## fselect(-.model) |>
+      frename(remainder = "Zscore") |>
+      collapse::join(.data, how = "left", overid = 0, verbose = FALSE)
+  } else if (!.impute & .detrend) {
+    .data <- .data_decomp |>
+      ## fselect(-.model) |>
+      frename(remainder = "Zscore")
+  }
+
+  if (!"Zscore" %in% colnames(.data)){
+    .data[["Zscore"]] <- .data[[.value_col]]
+  }
+
+  # If keep_decomp is TRUE, keep the decomposition components
+  if (!.keep_decomp & .detrend) {
+    .data <- .data |>
+      fselect(-.model, -trend, -season_adjust)
+    # If season specified, exclude season_year from variables
+    if (!is.null(.season) | .frequency != "yearly") {
+      collapse::get_vars(.data, "season*", regex = TRUE) <- NULL
+    }
+  }
+
+
+
+  # Try to transform data into a data.frame and then group them by country
+  # and indicator using fgroup_by
+  tryCatch({
+    .data <- as.data.frame(tsibble::as_tibble(.data))
+    .data <- collapse::fgroup_by(.data, c(.country_col, .indicator_col))
+  }, error = function(e) {
+    warning("Error converting to data frame: ", e$message)
+  })
+
+  # Normalize the Zscore
+  .data <- .data |>
+    fmutate(
+      Zscore_norm = fscale(Zscore),
+      Zscore_sd = fsd(Zscore, TRA = 1),
+      Zscore = Zscore_norm,
+      Zscore = replace(Zscore_norm, Zscore_sd < 1e-13, NA)
+    ) |>
+    fselect(-Zscore_norm, -Zscore_sd)
+
+  # Check if long format is FALSE, if so, pivot to wider format
+  if (!.long_format) {
     .data <- pivot(
       .data,
-      how = "longer",
+      how = "wider",
       ids = c(.country_col, .year_col),
-      values = c(.cols),
-      names = list(variable = "Indicator.Code", value =  "Zscore")
+      values = c("Zscore"),
+      names = .indicator_col
     )
   }
 
