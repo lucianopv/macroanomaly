@@ -164,3 +164,100 @@ tsoutliers_detection <- function(.data, .threshold = 3) {
 
   return(.data)
 }
+
+
+#' Function to detect point anomalies in a dataset using capa of the anomaly package
+#'
+#' @description This function detects point anomalies in a dataset using the capa method from the anomaly package.
+#'
+#' @param .data A data frame containing the dataset to be analyzed.
+#' @param .type A character string specifying the type of anomaly detection to be used, based on the
+#' capa method in the anomaly package. Default is "meanvar", which is for collective anomalies using joint
+#' changes in mean and variance.
+#'
+#' @return A data frame containing the original dataset with an additional column indicating the point anomaly status.
+#' @importFrom anomaly capa
+#' @importFrom collapse fmutate fungroup fselect fgroup_by BY GRP fcumsum na_locf frename join
+#'
+#' @export
+capa_detection <- function(.data,
+                           .type = "robustmean",
+                           .min_seg_len = 2,
+                           .country_col = c("Country.Code", "Country.Name"),
+                           .time_col = "Year",
+                           .indicator_col = "Indicator.Code") {
+  # Check if the anomaly package is installed
+  if (!requireNamespace("anomaly", quietly = TRUE)) {
+    stop("The anomaly package is required for this function. Please install it.")
+  }
+
+  # Check if the .type argument is valid
+  valid_types <- c("meanvar", "mean", "robustmean")
+  if (!.type %in% valid_types) {
+    stop(paste("Invalid type specified. Choose from:", paste(valid_types, collapse = ", ")))
+  }
+
+  # Check for missing values, remove them and alert the user
+  if (any(is.na(.data$Zscore))) {
+    warning("Missing values found in Zscore column. These will be removed from the analysis.")
+    .data_sub <- fsubset(fungroup(.data), !is.na(Zscore))
+  }
+
+  # Group the data by country and indicator
+  .grouped_data <- .data_sub |>
+    fungroup() |>
+    fselect(.country_col, .time_col, .indicator_col, "Zscore") |>
+    fgroup_by(c(.country_col, .indicator_col)) |>
+    GRP()
+
+  # Apply the capa method to detect point anomalies
+  outliers <- unlist(BY(x = as.matrix(.data_sub[,"Zscore"]), g = .grouped_data, FUN = anomaly::capa, type = .type, min_seg_len = .min_seg_len, return = 4)[[1]])
+
+  # Extract point anomalies
+  point_anomalies <- lapply(outliers, anomaly::point_anomalies)
+  names(point_anomalies) <- GRPnames(.grouped_data, sep = "._.")
+  point_anomalies <- unlist2d(point_anomalies, idcols = "Indicator")
+
+  .idx_point_anomalies <- as.data.frame(stringr::str_split_fixed(point_anomalies$Indicator, "._.", n = length(c(.country_col, .indicator_col))))
+  colnames(.idx_point_anomalies) <- c(.country_col, .indicator_col)
+  point_anomalies <- cbind(.idx_point_anomalies, point_anomalies[, -1])  # Remove the Indicator column
+
+  # Extract the collective anomalies
+  collective_anomalies <- lapply(outliers, anomaly::collective_anomalies)
+  names(collective_anomalies) <- GRPnames(.grouped_data, sep = "._.")
+  collective_anomalies <- unlist2d(collective_anomalies, idcols = "Indicator")
+
+  .idx_collective_anomalies <- as.data.frame(stringr::str_split_fixed(collective_anomalies$Indicator, "._.", n = length(c(.country_col, .indicator_col))))
+  colnames(.idx_collective_anomalies) <- c(.country_col, .indicator_col)
+  collective_anomalies <- cbind(.idx_collective_anomalies, collective_anomalies[, -1])  # Remove the Indicator column
+  collective_anomalies <- fmutate(collective_anomalies, location = start)
+
+
+  # Combine the results with the original data
+  .data <- .data |>
+    fungroup() |>
+    fgroup_by(c(.country_col, .indicator_col)) |>
+    fmutate(location = 1,
+            location = fcumsum(location),
+            type = "point") |>
+    join(point_anomalies, on = c(.country_col, .indicator_col, "location")) |>
+    frename(outlier_indicator = variate,
+            capa_strength = strength) |>
+    fselect(-location)
+
+  .data <- .data |>
+    fungroup() |>
+    fgroup_by(c(.country_col, .indicator_col)) |>
+    fmutate(location = 1,
+            location = fcumsum(location)) |>
+    join(collective_anomalies, on = c(.country_col, .indicator_col, "location")) |>
+    fmutate(start = collapse::na_locf(start),
+            end = collapse::na_locf(end),
+            outlier_indicator = ifelse(location >= start & location <= end, 1, NA),
+            type = ifelse(location >= start & location <= end, "collective", type)) |>
+    fselect(-c(start, end, location, start.lag, end.lag, variate))
+
+  # TODO: What do we want to keep?
+
+  return(.data)
+}

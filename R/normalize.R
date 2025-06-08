@@ -26,7 +26,7 @@ detrend <- function(.data,.year) {
 #' @param .data A data frame containing the data to be converted.
 #' @param .country_col A character vector specifying the name(s) of the country
 #' identifiers.
-#' @param .year_col A character vector specifying the name(s) of the time
+#' @param .time_col A character vector specifying the name(s) of the time
 #' identifiers. See \code{tsibble::as_tsibble()} for more details.
 #' @param .indicator_col A character vector specifying the name(s) of the indicator
 #' identifiers.
@@ -42,12 +42,12 @@ detrend <- function(.data,.year) {
 #' @export
 convert_to_tsibble <- function(.data,
                                .country_col = c("Country.Code", "Country.Name"),
-                               .year_col = "Year",
+                               .time_col = "Year",
                                .indicator_col = "Indicator.Code",
                                .frequency = "yearly",
                                .long_format = TRUE) {
   # Check if the required columns exist in the data
-  if (!all(c(.country_col, .year_col) %in% colnames(.data))) {
+  if (!all(c(.country_col, .time_col) %in% colnames(.data))) {
     stop("The specified columns do not exist in the data.")
   }
 
@@ -60,15 +60,15 @@ convert_to_tsibble <- function(.data,
 
   # Convert to tsibble
   if (.frequency %in% c("yearly", "year")) {
-    .data <- as_tsibble(.data, key = .keys, index = .year_col)
+    .data <- as_tsibble(.data, key = .keys, index = .time_col)
   } else if (.frequency %in% c("quarterly", "quarter")) {
     .data |>
-      fmutate(across(.year_col, tsibble::yearquarter)) |>
-      tsibble::as_tsibble(key = .keys, index = .year_col) -> .data
+      fmutate(across(.time_col, tsibble::yearquarter)) |>
+      tsibble::as_tsibble(key = .keys, index = .time_col) -> .data
   } else if (.frequency %in% c("monthly", "month")) {
     .data |>
-      fmutate(across(.year_col, tsibble::yearmonth)) |>
-      tsibble::as_tsibble(key = .keys, index = .year_col) -> .data
+      fmutate(across(.time_col, tsibble::yearmonth)) |>
+      tsibble::as_tsibble(key = .keys, index = .time_col) -> .data
   } else {
     stop("Invalid frequency. Choose 'yearly', 'quarterly', or 'monthly'.")
   }
@@ -88,7 +88,7 @@ convert_to_tsibble <- function(.data,
 #' na_locf, na_ma, na_seadec, na_random.
 #' @param .country_col A character vector specifying the name(s) of the country
 #' identifiers.
-#' @param .year_col A character vector specifying the name(s) of the time
+#' @param .time_col A character vector specifying the name(s) of the time
 #' identifiers.
 #' @param ... Additional arguments to be passed to the imputation function.
 #' @return A tsibble object with the imputed data and a column identifying the imputed values.
@@ -102,11 +102,11 @@ impute_missing <- function(.data,
                            .value_col,
                            .method = "na_interpolation",
                            .country_col = c("Country.Code", "Country.Name"),
-                           .year_col = "Year",
+                           .time_col = "Year",
                            .indicator_col = "Indicator.Code",
                            ...) {
   # Check if the required columns exist in the data
-  if (!all(c(.country_col, .year_col, .indicator_col) %in% colnames(.data))) {
+  if (!all(c(.country_col, .time_col, .indicator_col) %in% colnames(.data))) {
     stop("The specified columns do not exist in the data.")
   }
 
@@ -136,7 +136,7 @@ impute_missing <- function(.data,
   .missing_data <- check_missing_countries(.data,
                               .value_col = .value_col,
                               .country_col = .country_col,
-                              .year_col = .year_col,
+                              .time_col = .time_col,
                               .indicator_col = .indicator_col,
                               .min_obs = .min_obs)
 
@@ -168,7 +168,7 @@ impute_missing <- function(.data,
 #' @param .value_col A character vector specifying the name of the value column.
 #' @param .country_col A character vector specifying the name(s) of the country
 #' identifiers.
-#' @param .year_col A character vector specifying the name of the time
+#' @param .time_col A character vector specifying the name of the time
 #' identifiers.
 #' @param .indicator_col A character vector specifying the name(s) of the indicator
 #' identifiers.
@@ -183,11 +183,11 @@ impute_missing <- function(.data,
 check_missing_countries <- function(.data,
                               .value_col,
                               .country_col = c("Country.Code", "Country.Name"),
-                              .year_col = "Year",
+                              .time_col = "Year",
                               .indicator_col = "Indicator.Code",
                               .min_obs = 2) {
   # Check if the required columns exist in the data
-  if (!all(c(.country_col, .year_col) %in% colnames(.data))) {
+  if (!all(c(.country_col, .time_col) %in% colnames(.data))) {
     stop("The specified columns do not exist in the data.")
   }
 
@@ -289,7 +289,7 @@ decompose_tsibble <- function(.data,
 #' of the column (e.g., "AG.CON.FERT.PT.ZS" or "value").
 #' @param .country_col A character vector specifying the name(s) of the country
 #' identifiers
-#' @param .year_col A character vector specifying the name of the year column.
+#' @param .time_col A character vector specifying the name of the year column.
 #' @param .indicator_col A character vector specifying the name of the indicator
 #' identifiers.
 #' @param .frequency A character vector specifying the frequency of the time series.
@@ -317,7 +317,7 @@ decompose_tsibble <- function(.data,
 normalize <- function(.data,
                           .value_col,
                           .country_col = c("Country.Code", "Country.Name"),
-                          .year_col = "Year",
+                          .time_col = "Year",
                           .indicator_col = "Indicator.Code",
                           .frequency = "yearly",
                           .detrend = TRUE,
@@ -328,7 +328,7 @@ normalize <- function(.data,
                           .keep_decomp = FALSE,
                           ...) {
   # Check if the required columns exist in the data
-  if (!all(c(.country_col, .year_col, .indicator_col) %in% colnames(.data))) {
+  if (!all(c(.country_col, .time_col, .indicator_col) %in% colnames(.data))) {
     stop("The specified columns do not exist in the data.")
   }
 
@@ -353,7 +353,7 @@ normalize <- function(.data,
   if (!class(.data) %in% c("tbl_ts", "tbl_df")) {
     .data <- convert_to_tsibble(.data,
                       .country_col = .country_col,
-                      .year_col = .year_col,
+                      .time_col = .time_col,
                       .indicator_col = .indicator_col,
                       .frequency = .frequency,
                       .long_format = TRUE)
@@ -371,7 +371,7 @@ normalize <- function(.data,
     .data <- impute_missing(.data,
                              .value_col = .value_col,
                              .country_col = .country_col,
-                             .year_col = .year_col,
+                             .time_col = .time_col,
                              .indicator_col = .indicator_col,
                              .method = .method,
                              ...)
@@ -446,7 +446,7 @@ normalize <- function(.data,
     .data <- pivot(
       .data,
       how = "wider",
-      ids = c(.country_col, .year_col),
+      ids = c(.country_col, .time_col),
       values = c("Zscore"),
       names = .indicator_col
     )

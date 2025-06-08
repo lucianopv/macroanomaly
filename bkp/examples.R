@@ -12,36 +12,46 @@ wdi_data |>
 wdi_data_long |>
   fsubset(Indicator.Code %in% c("EG.CFT.ACCS.ZS", "NY.GDP.MKTP.CN.AD") & Year > 2005) -> wdi_data_long_subset
 
-wdi_data_long_subset |>
-  convert_to_tsibble(.country_col = c("Country.Code", "Country.Name"),
-                      .year_col = "Year",
-                      .indicator_col = "Indicator.Code",
-                      .frequency = "yearly") -> wdi_data_tsibble
+# wdi_data_long_subset |>
+#   convert_to_tsibble(.country_col = c("Country.Code", "Country.Name"),
+#                       .year_col = "Year",
+#                       .indicator_col = "Indicator.Code",
+#                       .frequency = "yearly") -> wdi_data_tsibble
 
-# Will produce error due to lack of data points in some countries
-wdi_data_tsibble |>
-  impute_missing(.value_col = "Indicator.Value",
-                 .country_col = c("Country.Code", "Country.Name"),
-                 .year_col = "Year",
-                 .indicator_col = "Indicator.Code",
-                 .method = "na_kalman") -> wdi_data_long_subset_imputed
+# # Will produce error due to lack of data points in some countries
+# wdi_data_tsibble |>
+#   impute_missing(.value_col = "Indicator.Value",
+#                  .country_col = c("Country.Code", "Country.Name"),
+#                  .year_col = "Year",
+#                  .indicator_col = "Indicator.Code",
+#                  .method = "na_kalman") -> wdi_data_long_subset_imputed
 
 # Will not produce error
-wdi_data_tsibble |>
-  dplyr::filter(!Country.Code %in% c("ABW", "ASM", "BGR", "BMU", "CHI", "CUW", "CYM",
-                                     "FRO", "GIB", "GRL", "GUM", "HKG", "IMN", "INX",
-                                     "LBN", "LBY", "LIE", "MAC", "MAF", "MNP", "NCL",
-                                     "PRI", "PSE", "PYF", "SXM", "TCA", "VGB", "VIR", "XKX")) |>
-  impute_missing(.value_col = "Indicator.Value",
-                 .country_col = c("Country.Code", "Country.Name"),
-                 .year_col = "Year",
-                 .indicator_col = "Indicator.Code",
-                 .method = "na_kalman") -> wdi_data_long_subset_imputed
+# wdi_data_tsibble |>
+#   dplyr::filter(!Country.Code %in% c("ABW", "ASM", "BGR", "BMU", "CHI", "CUW", "CYM",
+#                                      "FRO", "GIB", "GRL", "GUM", "HKG", "IMN", "INX",
+#                                      "LBN", "LBY", "LIE", "MAC", "MAF", "MNP", "NCL",
+#                                      "PRI", "PSE", "PYF", "SXM", "TCA", "VGB", "VIR", "XKX")) |>
+#   impute_missing(.value_col = "Indicator.Value",
+#                  .country_col = c("Country.Code", "Country.Name"),
+#                  .year_col = "Year",
+#                  .indicator_col = "Indicator.Code",
+#                  .method = "na_kalman") -> wdi_data_long_subset_imputed
 
-wdi_data_long_subset_imputed |>
-  decompose_tsibble(
-    .value_col = "Indicator.Value",
-    .frequency = "yearly") -> wdi_data_long_subset_imputed_decomposed
+# wdi_data_long_subset_imputed |>
+#   decompose_tsibble(
+#     .value_col = "Indicator.Value",
+#     .frequency = "yearly") -> wdi_data_long_subset_imputed_decomposed
+
+# Error due to lack of countries
+wdi_data_long_subset |>
+  normalize(.value_col = "Indicator.Value",
+            .country_col = c("Country.Code", "Country.Name"),
+            .year_col = "Year",
+            ## .keep_decomp = TRUE,
+            .detrend = TRUE,
+            .impute = TRUE
+  ) -> wdi_data_long_subset_norm
 
 wdi_data_long_subset |>
   fsubset(!Country.Code %in% c("ABW", "ASM", "BGR", "BMU", "CHI", "CUW", "CYM",
@@ -56,7 +66,7 @@ wdi_data_long_subset |>
   normalize(.value_col= "Indicator.Value",
             .country_col = c("Country.Code", "Country.Name"),
             .year_col = "Year",
-            ## .keep_decomp = TRUE,
+            .keep_decomp = TRUE,
             .detrend = TRUE,
             .impute = TRUE
             ) -> wdi_data_long_subset_norm
@@ -139,6 +149,7 @@ imf_data_long |>
             .frequency = "monthly",
             .value_col = "value",
             .country_col = "Country",
+            .keep_decomp = TRUE,
             .year_col = "TIME_PERIOD") -> imf_data_long_subset_norm
 
 zscore_detection(imf_data_long_subset_norm)
