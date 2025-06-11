@@ -65,7 +65,7 @@ wdi_data_long_subset |>
                                )) |>
   normalize(.value_col= "Indicator.Value",
             .country_col = c("Country.Code", "Country.Name"),
-            .year_col = "Year",
+            .time_col = "Year",
             .keep_decomp = TRUE,
             .detrend = TRUE,
             .impute = TRUE
@@ -76,7 +76,25 @@ zscore_detection(wdi_data_long_subset_norm)
 
 isotree_detection(wdi_data_long_subset_norm)
 
+outliertree_detection(wdi_data_long_subset_norm)
+
 tsoutliers_detection(wdi_data_long_subset_norm) |> fungroup() |> fsubset(Country.Code == "ARM")
+
+capa_detection(wdi_data_long_subset_norm, .min_seg_len = 3)
+
+# With detect function
+detect(wdi_data_long_subset_norm, .method = "zscore")
+
+detect(wdi_data_long_subset_norm, .method = "isotree")
+
+detect(wdi_data_long_subset_norm |> fsubset(Country.Code %in% c("AFG", "AGO", "ARG", "URG")), .method = "outliertree")
+
+detect(wdi_data_long_subset_norm, .method = "tsoutlier")
+
+detect(wdi_data_long_subset_norm, .method = "capa", .min_seg_len = 3)
+
+## Multiple methods using detect
+detect(wdi_data_long_subset_norm, .method = c("zscore", "isotree", "tsoutlier", "capa"), .min_seg_len = 3) -> tmp_results
 
 wdi_data_long_subset_norm |>
   tsoutliers_detection() |>
@@ -116,23 +134,23 @@ imf_data |>
     Frequency = stringr::str_split_i(variable, "\\.", 1),
     variable = stringr::str_split_i(variable, "\\.", 3)) -> imf_data_long
 
-imf_data_long |>
-  fsubset(Country %!=% "YE", TIME_PERIOD:Frequency) |>
-  convert_to_tsibble(.country_col = "Country",
-                     .year_col = "TIME_PERIOD",
-                     .indicator_col = "variable",
-                     .frequency = "monthly") |>
-  impute_missing(.value_col = "value",
-                 .country_col = "Country",
-                 .year_col = "TIME_PERIOD",
-                 .indicator_col = "variable",
-                 .method = "na_kalman") -> imf_data_long_imputed
+# imf_data_long |>
+#   fsubset(Country %!=% "YE", TIME_PERIOD:Frequency) |>
+#   convert_to_tsibble(.country_col = "Country",
+#                      .year_col = "TIME_PERIOD",
+#                      .indicator_col = "variable",
+#                      .frequency = "monthly") |>
+#   impute_missing(.value_col = "value",
+#                  .country_col = "Country",
+#                  .year_col = "TIME_PERIOD",
+#                  .indicator_col = "variable",
+#                  .method = "na_kalman") -> imf_data_long_imputed
 
-imf_data_long_imputed %>%
-  fmutate(TIME_PERIOD = yearmonth(TIME_PERIOD)) %>%
-  as_tsibble(key = Country, index = TIME_PERIOD, regular = TRUE) %>%
-  model(STL(value ~ trend(), na.action = na.omit)) %>%
-  components()
+# imf_data_long_imputed %>%
+#   fmutate(TIME_PERIOD = yearmonth(TIME_PERIOD)) %>%
+#   as_tsibble(key = Country, index = TIME_PERIOD, regular = TRUE) %>%
+#   model(STL(value ~ trend(), na.action = na.omit)) %>%
+#   components()
 
 # Will cause error due to lack of data points in some countries
 imf_data_long |>
@@ -140,7 +158,7 @@ imf_data_long |>
             .frequency = "monthly",
           .value_col = "value",
           .country_col = "Country",
-          .year_col = "TIME_PERIOD") -> imf_data_long_subset_norm
+          .time_col = "TIME_PERIOD") -> imf_data_long_subset_norm
 
 # Will cause error due to lack of data points in some countries
 imf_data_long |>
@@ -150,9 +168,19 @@ imf_data_long |>
             .value_col = "value",
             .country_col = "Country",
             .keep_decomp = TRUE,
-            .year_col = "TIME_PERIOD") -> imf_data_long_subset_norm
+            .time_col = "TIME_PERIOD") -> imf_data_long_subset_norm
 
 zscore_detection(imf_data_long_subset_norm)
+
+detect(imf_data_long_subset_norm, .method = "zscore")
+
+detect(imf_data_long_subset_norm, .method = "isotree")
+
+detect(imf_data_long_subset_norm, .method = "capa",
+       .country_col = "Country", .time_col = "TIME_PERIOD", .indicator_col = "variable")
+
+detect(imf_data_long_subset_norm, .method = c("zscore", "capa"),
+       .country_col = "Country", .time_col = "TIME_PERIOD", .indicator_col = "variable")
 
 imf_data_long_subset_norm |>
   fselect(Country, TIME_PERIOD, value, Zscore, variable, Imputed) |>
@@ -161,8 +189,10 @@ imf_data_long_subset_norm |>
 imf_data_long_subset_norm |>
   tsoutliers_detection()
 
+
+# Example Sudan with all other countries
 imf_data_long_subset_norm |>
-  tsoutliers_detection() |>
+  detect(.method = "isotree") |>
   fungroup() |>
   as.data.frame() |>
   fmutate(TIME_PERIOD = as.Date(TIME_PERIOD)) |>
@@ -171,7 +201,7 @@ imf_data_long_subset_norm |>
   geom_line() +
   geom_point() -> tmp_value
 imf_data_long_subset_norm |>
-  tsoutliers_detection() |>
+  detect(.method = "isotree") |>
   fungroup() |>
   as.data.frame() |>
   fmutate(TIME_PERIOD = as.Date(TIME_PERIOD)) |>
@@ -180,22 +210,20 @@ imf_data_long_subset_norm |>
   geom_point() -> tmp_zscore
 tmp_value / tmp_zscore + plot_layout(guides = "collect")
 
-
-imf_data_long_subset_norm |>
-  isotree_detection() |>
-  fungroup() |>
+# Example Sudan using isotree_detection but only Sudan
+imf_data_long_subset_norm |> fungroup() |> fsubset(Country == "SD") |>
+  detect(.method = "isotree") |>
   as.data.frame() |>
   fmutate(TIME_PERIOD = as.Date(TIME_PERIOD)) |>
-  fsubset(Country == "SD") |>
   ggplot(aes(x = TIME_PERIOD, y = value, color = outlier_indicator, group = Country, shape = Imputed)) +
   geom_line() +
   geom_point() -> tmp_value
-imf_data_long_subset_norm |>
-  isotree_detection() |>
-  fungroup() |>
+imf_data_long_subset_norm |> fungroup() |> fsubset(Country == "SD") |>
+  detect(.method = "isotree") |>
   as.data.frame() |>
   fmutate(TIME_PERIOD = as.Date(TIME_PERIOD)) |>
-  fsubset(Country == "SD") |>
   ggplot(aes(x = TIME_PERIOD, y = Zscore, color = outlier_indicator, group = Country, shape = Imputed)) +
   geom_point() -> tmp_zscore
 tmp_value / tmp_zscore + plot_layout(guides = "collect")
+
+

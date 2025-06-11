@@ -7,7 +7,7 @@
 convert_to_tsibble(
   .data,
   .country_col = c("Country.Code", "Country.Name"),
-  .year_col = "Year",
+  .time_col = "Year",
   .indicator_col = "Indicator.Code",
   .frequency = "yearly",
   .long_format = TRUE
@@ -19,7 +19,7 @@ convert_to_tsibble(
 \item{.country_col}{A character vector specifying the name(s) of the country
 identifiers.}
 
-\item{.year_col}{A character vector specifying the name(s) of the time
+\item{.time_col}{A character vector specifying the name(s) of the time
 identifiers. See \code{tsibble::as_tsibble()} for more details.}
 
 \item{.indicator_col}{A character vector specifying the name(s) of the indicator

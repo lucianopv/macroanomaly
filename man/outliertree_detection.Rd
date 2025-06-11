@@ -7,6 +7,7 @@
 outliertree_detection(
   .data,
   .cols = NULL,
+  .threshold = 0.5,
   .save_outliers = TRUE,
   .nthreads = 2,
   ...
@@ -16,6 +17,8 @@ outliertree_detection(
 \item{.data}{A data frame containing the dataset to be analyzed.}
 
 \item{.cols}{A character vector specifying the columns to be used for outlier detection. Default is NULL, which uses all columns.}
+
+\item{.threshold}{A numeric value specifying the threshold for outlier detection. Default is 0.5.}
 
 \item{.save_outliers}{A logical value indicating whether to save the outliers. Default is TRUE.}
 

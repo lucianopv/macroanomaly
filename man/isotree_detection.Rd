@@ -2,7 +2,7 @@
 % Please edit documentation in R/detection.R
 \name{isotree_detection}
 \alias{isotree_detection}
-\title{Function to apply outlier detection}
+\title{Function to apply the isotree algorithm}
 \usage{
 isotree_detection(
   .data,
@@ -26,17 +26,11 @@ isotree_detection(
 \item{.threshold}{A numeric value specifying the threshold for outlier detection. Default is 0.5.}
 
 \item{...}{Additional arguments to be passed to the isotree algorithm.}
-
-\item{.method}{A string specifying the outlier detection method to be used. Options are "zscore", "iqr", or "mad".
-
-Function to apply the isotree algorithm}
 }
 \value{
 A data frame containing the original dataset with an additional column indicating the outlier score and indicator
 based on the specified threshold.
 }
 \description{
-This function applies outlier detection to a given dataset using the specified method.
-
 This function applies the isotree algorithm to a given dataset for outlier detection.
 }

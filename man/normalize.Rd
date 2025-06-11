@@ -8,7 +8,7 @@ normalize(
   .data,
   .value_col,
   .country_col = c("Country.Code", "Country.Name"),
-  .year_col = "Year",
+  .time_col = "Year",
   .indicator_col = "Indicator.Code",
   .frequency = "yearly",
   .detrend = TRUE,
@@ -30,7 +30,7 @@ of the column (e.g., "AG.CON.FERT.PT.ZS" or "value").}
 \item{.country_col}{A character vector specifying the name(s) of the country
 identifiers}
 
-\item{.year_col}{A character vector specifying the name of the year column.}
+\item{.time_col}{A character vector specifying the name of the year column.}
 
 \item{.indicator_col}{A character vector specifying the name of the indicator
 identifiers.}

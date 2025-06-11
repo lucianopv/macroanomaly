@@ -9,7 +9,7 @@ impute_missing(
   .value_col,
   .method = "na_interpolation",
   .country_col = c("Country.Code", "Country.Name"),
-  .year_col = "Year",
+  .time_col = "Year",
   .indicator_col = "Indicator.Code",
   ...
 )
@@ -24,7 +24,7 @@ na_locf, na_ma, na_seadec, na_random.}
 \item{.country_col}{A character vector specifying the name(s) of the country
 identifiers.}
 
-\item{.year_col}{A character vector specifying the name(s) of the time
+\item{.time_col}{A character vector specifying the name(s) of the time
 identifiers.}
 
 \item{...}{Additional arguments to be passed to the imputation function.}

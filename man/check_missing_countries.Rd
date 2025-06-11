@@ -8,7 +8,7 @@ check_missing_countries(
   .data,
   .value_col,
   .country_col = c("Country.Code", "Country.Name"),
-  .year_col = "Year",
+  .time_col = "Year",
   .indicator_col = "Indicator.Code",
   .min_obs = 2
 )
@@ -21,7 +21,7 @@ check_missing_countries(
 \item{.country_col}{A character vector specifying the name(s) of the country
 identifiers.}
 
-\item{.year_col}{A character vector specifying the name of the time
+\item{.time_col}{A character vector specifying the name of the time
 identifiers.}
 
 \item{.indicator_col}{A character vector specifying the name(s) of the indicator
