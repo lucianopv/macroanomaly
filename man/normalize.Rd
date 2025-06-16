@@ -7,9 +7,9 @@
 normalize(
   .data,
   .value_col,
-  .country_col = c("Country.Code", "Country.Name"),
-  .time_col = "Year",
-  .indicator_col = "Indicator.Code",
+  .country_col,
+  .time_col,
+  .indicator_col,
   .frequency = "yearly",
   .detrend = TRUE,
   .season = NULL,
@@ -30,7 +30,8 @@ of the column (e.g., "AG.CON.FERT.PT.ZS" or "value").}
 \item{.country_col}{A character vector specifying the name(s) of the country
 identifiers}
 
-\item{.time_col}{A character vector specifying the name of the year column.}
+\item{.time_col}{A character vector specifying the name(s) of the time
+identifiers.}
 
 \item{.indicator_col}{A character vector specifying the name of the indicator
 identifiers.}
@@ -56,6 +57,9 @@ Default is TRUE.}
 
 \item{.keep_decomp}{A logical value indicating whether to keep the decomposition
 components in the output. Default is FALSE.}
+
+\item{...}{Additional arguments to be passed to the imputation function.
+See \code{imputeTS} for more details on the different methods.}
 }
 \value{
 A data frame with the normalized and detrended data.

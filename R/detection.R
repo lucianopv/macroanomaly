@@ -2,7 +2,8 @@
 #'
 #' @description This function applies outlier detection to a given dataset using the specified method.
 #'
-#' @param .data A data frame containing the dataset to be analyzed.
+#' @param .x An object from the \code{normalize} function, which is a data frame containing the normalized
+#' data to be analyzed.
 #' @param .method A single character string or character vector specifying the outlier detection method to be used.
 #' Options are \code{"zscore"}, \code{"tsoutlier"}, \code{"isotree"}, \code{"outliertree"}, or \code{"capa"}.
 #' \code{"zscore"} is the default method, it calculates the Z-score for each observation and identifies outliers
@@ -12,10 +13,12 @@
 #' \code{isotree} package to detect outliers. Similarly, \code{"outliertree"} applies the \code{outliertree} algorithm
 #' of the \code{outliertree} package to detect outliers. Finally, \code{"capa"} applies the \code{capa} method
 #' of the \code{anomaly} package to detect point and collective anomalies.
-#' @param .country_col A character vector specifying the column names for country identifiers. Default is
-#' \code{c("Country.Code", "Country.Name")}.
-#' @param .time_col A character string specifying the column name for time identifiers. Default is \code{"Year"}.
-#' @param .indicator_col A character string specifying the column name for indicator identifiers. Default is \code{"Indicator.Code"}.
+#' @param .country_col A character vector specifying the column names for country identifiers. Not needed if these
+#' are the same as the ones defined for the \code{normalize} function.
+#' @param .time_col A character string specifying the column name for time identifiers.Not needed if these are the
+#' same as the ones defined for the \code{normalize} function.
+#' @param .indicator_col A character string specifying the column name for indicator identifiers. Not needed if these
+#' are the same as the ones defined for the \code{normalize} function.
 #' @param ... Additional arguments to be passed to the specific outlier detection method. See Details
 #' for arguments for each method.
 #'
@@ -39,44 +42,84 @@
 #'
 #'
 #'@export
-detect <- function(.data,
+detect <- function(.x,
                    .method = "zscore",
-                   .country_col = c("Country.Code", "Country.Name"),
-                   .time_col = "Year",
-                   .indicator_col = "Indicator.Code",
+                   .country_col = NULL,
+                   .time_col = NULL,
+                   .indicator_col = NULL,
+                   .additional_cols = FALSE,
                    ...) {
+  # Check the input is a data frame and "maly_norm" class
+  if (!inherits(.x, "maly_norm") || !is.data.frame(.x)) {
+    stop("Input must be a data frame and 'maly' class.")
+  }
+
+
   # Check if the method is valid
   valid_methods <- c("zscore", "tsoutlier", "isotree", "outliertree", "capa")
   if (!any(.method %in% valid_methods)) {
     stop(paste("Invalid method specified. Choose from:", paste(valid_methods, collapse = ", ")))
   }
 
+  # Define .country_col, .time_col and .indicator_col using the attribute if values are NULL
+  if (any(is.null(c(.country_col, .time_col, .indicator_col)))){
+    if (is.null(.country_col)) {
+      .country_col <- attr(.x, "country_columns", exact = TRUE)
+    }
+    if (is.null(.time_col)) {
+      .time_col <- attr(.x, "time_columns", exact = TRUE)
+    }
+    if (is.null(.indicator_col)) {
+      .indicator_col <- attr(.x, "indicator_columns", exact = TRUE)
+    }
+  }
+
+  # Define the value column
+  .value_col <- attr(.x, "value_column", exact = TRUE)
+
+  # Check if the required columns exist in the data
+  if (!all(c(.country_col, .time_col, .indicator_col) %in% colnames(.x))) {
+    stop("One or more specified columns do not exist in the data frame.")
+  }
+
   if (length(.method) == 1) {
     # Call the appropriate detection function based on the method
     results <- switch(.method,
-         zscore = doCall(zscore_detection, .data = .data, ...),
-         tsoutlier = doCall(tsoutliers_detection, .data  = .data, ...),
-         isotree = doCall(isotree_detection, .data  = .data, ...),
-         outliertree = doCall(outliertree_detection, .data = .data, ...),
-         capa = doCall(capa_detection, .data = .data, .country_col = .country_col,
+         zscore = doCall(zscore_detection, .data = .x, ...),
+         tsoutlier = doCall(tsoutliers_detection, .data  = .x, ...),
+         isotree = doCall(isotree_detection, .data  = .x, ...),
+         outliertree = doCall(outliertree_detection, .data = .x, ...),
+         capa = doCall(capa_detection, .data = .x, .country_col = .country_col,
                        .time_col = .time_col, .indicator_col = .indicator_col, ...))
 
-    return(results)
+    # If additional columns are specified, select them
+    if (!.additional_cols) {
+      # Select only the original columns and the outlier indicator columns
+      .columns <- c(.country_col, .time_col, .indicator_col, .value_col, "Zscore", "outlier_indicator")
+      if("Imputed" %in% colnames(.x)) {
+        .columns <- c(.columns, "Imputed")
+      }
+      results <- results[, .columns, drop = FALSE]
+    } else {
+      # If additional columns are specified, keep all columns
+      results <- results
+    }
+
    } else if (length(.method) > 1) {
       # If multiple methods are specified, apply each method and combine results
       results <- lapply(.method, function(method) {
         switch(method,
-               zscore = doCall(zscore_detection, .data = .data, ...),
-               tsoutlier = doCall(tsoutliers_detection, .data = .data, ...),
-               isotree = doCall(isotree_detection, .data = .data, ...),
-               outliertree = doCall(outliertree_detection, .data = .data, ...),
-               capa = doCall(capa_detection, .data = .data, .country_col = .country_col,
+               zscore = doCall(zscore_detection, .data = .x, ...),
+               tsoutlier = doCall(tsoutliers_detection, .data = .x, ...),
+               isotree = doCall(isotree_detection, .data = .x, ...),
+               outliertree = doCall(outliertree_detection, .data = .x, ...),
+               capa = doCall(capa_detection, .data = .x, .country_col = .country_col,
                              .time_col = .time_col, .indicator_col = .indicator_col, ...)
         )
       })
 
       # Select the original columns names
-      .columns <- names(.data)
+      .columns <- names(.x)
 
       # Add suffix to the outlier indicator columns
       results <- mapply(function(res, method) {
@@ -89,17 +132,51 @@ detect <- function(.data,
 
       # Combine results into a single data frame
       combined_results <- Reduce(function(x, y) {
-        merge(x, y, by = .columns, suffixes = , all = TRUE)
+        merge(x, y, by = .columns, all = TRUE)
       }, results)
 
       # Names of variables with outlier_indicator
       outlier_cols <- grep("outlier_indicator", names(combined_results), value = TRUE)
 
       # Create a new column that combines all outlier indicators
-      combined_results$outlier_indicator_votes <- rowSums(combined_results[outlier_cols], na.rm = TRUE)
+      combined_results$outlier_indicator_total <- rowSums(combined_results[outlier_cols], na.rm = TRUE)
 
-      return(combined_results)
-    }
+      # Sort according to the total outlier indicator column
+      combined_results <- combined_results[order(-combined_results$outlier_indicator_total), ]
+
+      # If .additional_cols is FALSE, select only the original columns and the outlier indicator columns
+      # including the outlier_indicator for each method and the outlier_indicator_total
+      if (!.additional_cols) {
+        .columns <- c(.country_col, .time_col, .indicator_col, .value_col, outlier_cols, "outlier_indicator_total")
+        if("Imputed" %in% colnames(.x)) {
+          .columns <- c(.columns, "Imputed")
+        }
+        combined_results <- combined_results[, .columns]
+      } else {
+        # If additional columns are specified, keep all columns
+        combined_results <- combined_results
+      }
+
+      results <- combined_results
+   }
+
+  # Save some of the original attributes in a new attribute
+  .attr_norm_names <- c("frequency", "detrend", "impute", "impute_method",
+                  "keep_decomp", "long_format")
+  .attr_norm <- lapply(.attr_norm_names, \(x) attr(.x, x))
+  names(.attr_norm) <- .attr_norm_names
+  attr(results, "maly_norm_attrs") <- .attr_norm
+
+  # Include new attributes from detect
+  attr(results, "country_columns") <- .country_col
+  attr(results, "time_columns") <- .time_col
+  attr(results, "indicator_columns") <- .indicator_col
+  attr(results, "value_column") <- attr(.x, "value_column", exact = TRUE)
+  attr(results, "maly_detect_attr") <- list("method" = .method,
+                                            "additional_cols" = .additional_cols)
+  attr(results, "class") <- c("maly_detect", class(.x))
+
+  return(results)
 }
 
 
@@ -146,8 +223,10 @@ isotree_detection <- function(.data,
   if (any(sapply(.data, function(x) inherits(x, "vctrs_vctr")))) {
     # Obtain index of column with class "vctrs_vctr"
     vctrs_col_index <- which(sapply(.data, function(x) inherits(x, "vctrs_vctr")))
+    .original_data <- .data[, vctrs_col_index]
     .data <- .data |>
       ftransformv(vctrs_col_index, as.Date)
+
   }
 
   # Apply the isotree algorithm
@@ -156,8 +235,11 @@ isotree_detection <- function(.data,
   # Predict outlier scores
   outlier_scores <- predict(model, .data, type = "score")
 
-  # Convert back to original date format
-  # TODO: Need to go back so we can merge with others, or create an if clause in detect
+
+  # If the original data was a vctrs_vctr, replace the transformed dates with the original ones
+  if (exists(".original_data")) {
+    .data[, vctrs_col_index] <- .original_data
+  }
 
   # Create a data frame with the original dataset and outlier scores
   .data <- .data |>
@@ -165,6 +247,7 @@ isotree_detection <- function(.data,
     fmutate(outlier_score = outlier_scores,
       outlier_indicator = ifelse(outlier_score > .threshold, 1, 0)) |>
     roworder(-outlier_score)
+
 
   return(.data)
 }
@@ -375,4 +458,345 @@ capa_detection <- function(.data,
   # TODO: What do we want to keep?
 
   return(.data)
+}
+
+
+#' Summary method for maly_detect class
+#'
+#' @description This function provides a summary of the maly_detect class object.
+#'
+#' @param x An object of class maly_detect.
+#' @param ... Additional arguments (not used).
+#'
+#' @export
+#' @method summary maly_detect
+#' @order 1
+summary.maly_detect <- function(x, ...) {
+  # Check if the object is of class maly_detect
+  if (!inherits(x, "maly_detect")) {
+    stop("x must be of class 'maly_detect'.")
+  }
+
+  # Get the method used for detection
+  method <- attr(x, "maly_detect_attr")$method
+
+  # Get the number of rows and columns in the data frame
+  n_rows <- nrow(x)
+  n_cols <- ncol(x)
+
+  # Get the columns used for country, time, and indicator
+  country_cols <- attr(x, "country_columns")
+  time_col <- attr(x, "time_columns")
+  indicator_col <- attr(x, "indicator_columns")
+
+
+  if (length(method) > 1) {
+    # Get the number of countries with outliers
+    n_countries <- length(unique(x[x$outlier_indicator_total == 1, country_cols]))
+    n_indicators <- length(unique(x[x$outlier_indicator_total == 1, indicator_col]))
+    n_time_periods <- length(unique(x[x$outlier_indicator_total == 1, time_col]))
+
+    # Get the number of outliers detected
+    n_outliers <- sum(x$outlier_indicator_total, na.rm = TRUE)
+  } else {
+    # Get the number of countries with outliers
+    n_countries <- length(unique(x[x$outlier_indicator == 1, country_cols]))
+    n_indicators <- length(unique(x[x$outlier_indicator == 1, indicator_col]))
+    n_time_periods <- length(unique(x[x$outlier_indicator == 1, time_col]))
+
+    # Get the number of outliers detected
+    n_outliers <- sum(x$outlier_indicator, na.rm = TRUE)
+  }
+
+  # Table of outliers per country
+  if (n_countries > 0) {
+    if(length(method) > 1) {
+      outlier_table <- table(x[x$outlier_indicator_total == 1, country_cols])
+      # Extract the country with most outliers
+      most_outliers_country <- names(which.max(outlier_table))
+    } else {
+      outlier_table <- table(x[x$outlier_indicator == 1, country_cols])
+      # Extract the country with most outliers
+      most_outliers_country <- names(which.max(outlier_table))
+    }
+  }
+
+  # If method is NULL, set it to "Unknown"
+  if (is.null(method)) {
+    method <- "Unknown"
+  } else if (length(method) > 1) {
+    method <- paste(method, collapse = ", ")
+  }
+
+  # Print summary information
+  cat("Summary of Macroanomaly detect:\n")
+  cat("  Method(s) used for detection:", method, "\n")
+  cat("  Number of rows:", n_rows, "\n")
+  cat("  Number of columns:", n_cols, "\n\n")
+
+  cat(" Information of outliers: \n")
+
+  cat("  Number of countries with outliers:", n_countries, "of a total of" ,
+      length(unique(x[[country_cols]])), "countries\n")
+  cat("  Number of indicators with outliers:", n_indicators, "of a total of",
+      length(unique(x[[indicator_col]])), "indicators\n")
+  cat("  Number of time periods with outliers:", n_time_periods, "of a total of",
+      length(unique(x[[time_col]])), "time periods\n")
+  cat("  Number of outliers detected:", n_outliers, "\n")
+
+  if (n_countries > 0) {
+    cat("  Country with most outliers:", most_outliers_country, "\n")
+    cat("    - Number of outliers in this country:", outlier_table[most_outliers_country], "\n")
+  } else {
+    cat("No outliers detected.\n")
+  }
+
+}
+
+
+#' Plot method for maly_detect class
+#'
+#' @description This function provides a plot of the outliers detected in the maly_detect class object.
+#'
+#' @param x An object of class maly_detect.
+#' @param country A character vector specifying the country to plot.
+#' Default is NULL, which means first country in the data will be used.
+#' @param indicator A string specifying the indicator to plot. Only one per graph.
+#' Default is NULL, which means the first indicator in the data will be used.
+#' @param x.lab A string specifying the label for the x-axis.
+#' Default is NULL, which means the time column will be used.
+#' @param y.lab A string specifying the label for the y-axis of the original value (top graph).
+#' Default is NULL, which means the value column will be used.
+#' @param ... Additional arguments to be passed to the plot function.
+#'
+#' @return A ggplot object showing the outliers detected in the specified country and indicator.
+#'
+#' @importFrom ggplot2 ggplot aes guides geom_line geom_point labs theme element_text facet_wrap scale_color_manual scale_shape_manual geom_ribbon scale_fill_manual geom_vline scale_alpha_manual
+#' @importFrom rlang sym
+#' @importFrom collapse fsubset fgroup_by fmutate fselect ftransformv
+#' @importFrom patchwork plot_layout
+#' @importFrom lubridate NA_Date_
+#'
+#' @export
+#' @method plot maly_detect
+plot.maly_detect <- function(x, country = NULL, indicator = NULL, x.lab = NULL, y.lab = NULL, ...) {
+  # Check if country and indicator are specified
+  if (is.null(indicator)) {
+    indicator <- unique(x[[attr(x, "indicator_columns")[1]]])[1]
+  }
+  if (is.null(country)) {
+    # Filter the first country in the data with data of the indicator
+    country <- sort(unique(x[ x[[attr(x, "indicator_columns")[1]]] == indicator , attr(x, "country_columns")[1]]))[1]
+  }
+
+
+  # Filter data for the specified country and indicator
+  .data <- x[x[[attr(x, "country_columns")[1]]] %in% country &
+               x[[attr(x, "indicator_columns")[1]]] %in% indicator, ]
+
+  # Check if the data is empty
+  if (nrow(.data) == 0) {
+    stop(paste("No data found for country:", country, "and indicator:", indicator))
+  }
+
+  # Check if the time column exists
+  if (!attr(x, "time_columns")[1] %in% colnames(.data)) {
+    stop(paste("The time column", attr(x, "time_columns")[1], "does not exist in the data."))
+  }
+
+  # Check if the frequency is yearly or not
+  if (attr(x, "maly_norm_attrs")$frequency == "yearly") {
+    # Convert the time column to Date if it is not already
+    if (!inherits(.data[[attr(x, "time_columns")[1]]], "Date")) {
+      .data[[attr(x, "time_columns")[1]]] <- as.Date(paste(.data[[attr(x, "time_columns")[1]]], "-01-01", sep = ""))
+    }
+  } else {
+    if (!inherits(.data[[attr(x, "time_columns")[1]]], "Date")) {
+      .data[[attr(x, "time_columns")[1]]] <- as.Date(.data[[attr(x, "time_columns")[1]]])
+    }
+  }
+
+  # Check if the value column exists
+  if (!attr(x, "value_column") %in% colnames(.data)) {
+    stop(paste("The value column", attr(x, "value_column"), "does not exist in the data."))
+  }
+
+  # Check if the Zscore column exists
+  if (!"Zscore" %in% colnames(.data)) {
+    stop("The Zscore column does not exist in the data. Consider running the normalize function first.")
+  }
+
+  # Relabel Imputed column if it exists
+  if ("Imputed" %in% colnames(.data)) {
+    .data$Imputed <- factor(.data$Imputed, levels = c(TRUE, FALSE), labels = c("Imputed", "Not Imputed"))
+  }
+
+  # Check if multiple methods were used
+  if (length(attr(x, "maly_detect_attr")$method) > 1) {
+    .detection_col <- "outlier_indicator_total"
+    .data[[.detection_col]] <- ifelse(.data[[.detection_col]] > 0, "Outlier", "Not Outlier")
+    .data[[.detection_col]] <- factor(.data[[.detection_col]], levels = c("Outlier", "Not Outlier"))
+
+    # Summarise by country and indicator the time periods with outliers
+    .data_grouped <- .data[.data[[.detection_col]] == "Outlier",] |>
+      fgroup_by(c(attr(x, "country_columns")[1], attr(x, "indicator_columns")[1])) |>
+      fungroup()
+
+  } else {
+    .detection_col <- "outlier_indicator"
+    .data[[.detection_col]] <- ifelse(.data[[.detection_col]] > 0, "Outlier", "Not Outlier")
+    .data[[.detection_col]] <- factor(.data[[.detection_col]], levels = c("Outlier", "Not Outlier"))
+
+    .data_grouped <- .data[.data[[.detection_col]] == "Outlier",] |>
+      fgroup_by(c(attr(x, "country_columns")[1], attr(x, "indicator_columns")[1])) |>
+      fungroup()
+
+  }
+
+  # Check if x.lab and y.lab are specified, if not, use the time and value columns
+  if (is.null(x.lab)) {
+    x.lab <- attr(x, "time_columns")[1]
+  }
+
+  if (is.null(y.lab)) {
+    y.lab <- attr(x, "value_column")
+  }
+
+  # Create the plot based on imputation status
+  if (!"Imputed" %in% colnames(.data)) {
+    ggplot(.data, aes(x = .data[[attr(x, "time_columns")[1]]], y = .data[[attr(x, "value_column")]])) +
+      geom_line(alpha = 0.3) +
+      geom_point(aes(alpha = .data[[.detection_col]])) +
+      # geom_vline(data = .data_grouped, aes(xintercept = .data[[attr(x, "time_columns")[1]]]), color = "blue", linetype = "dashed") +
+      scale_alpha_manual(values = c("Outlier" = 1, "Not Outlier" = 0.2)) +
+      facet_wrap(~ .data[[attr(x, "country_columns")[1]]], scales = "free_y") +
+      guides(alpha = "none") +
+      labs(title = paste("Original Series for country", country, " and series", indicator),
+           alpha = "Outlier Indicator",
+           x = x.lab,
+           y = y.lab) -> original_plot
+
+    ggplot(.data, aes(x = .data[[attr(x, "time_columns")[1]]], y = Zscore)) +
+      geom_point(aes(alpha = .data[[.detection_col]])) +
+      # geom_vline(data = .data_grouped, aes(xintercept = .data[[attr(x, "time_columns")[1]]]), color = "blue", linetype = "dashed") +
+      scale_alpha_manual(values = c("Outlier" = 1, "Not Outlier" = 0.2)) +
+      facet_wrap(~ .data[[attr(x, "country_columns")[1]]], scales = "free_y") +
+      theme(axis.text = element_text(size = 8), legend.position = "bottom") +
+      labs(title = paste("Zscore for country", country, " and series", indicator),
+           alpha = "Outlier Indicator",
+           x = x.lab,
+           y = "Zscore") -> zscore_plot
+  } else{
+    ggplot(.data, aes(x = .data[[attr(x, "time_columns")[1]]], y = .data[[attr(x, "value_column")]])) +
+      geom_line(alpha = 0.3) +
+      geom_point(aes(shape = Imputed, color = Imputed, alpha = .data[[.detection_col]])) +
+      # geom_vline(data = .data_grouped, aes(xintercept = .data[[attr(x, "time_columns")[1]]]), color = "blue", linetype = "dashed") +
+      scale_color_manual(values = c("Imputed" = "red", "Not Imputed" = "black")) +
+      scale_shape_manual(values = c("Imputed" = 1, "Not Imputed" = 16)) +
+      scale_alpha_manual(values = c("Outlier" = 1, "Not Outlier" = 0.2)) +
+      facet_wrap(~ .data[[attr(x, "country_columns")[1]]], scales = "free_y") +
+      guides(alpha = "none") +
+      theme(axis.text = element_text(size = 8), legend.position = "bottom") +
+      labs(title = paste("Original Series for country", country, " and series", indicator),
+           alpha = "Outlier Indicator",
+           x = x.lab,
+           y = y.lab) -> original_plot
+
+    ggplot(.data, aes(x = .data[[attr(x, "time_columns")[1]]], y = Zscore)) +
+      geom_point(aes(shape = Imputed, color = Imputed, alpha = .data[[.detection_col]])) +
+      # geom_vline(data = .data_grouped, aes(xintercept = .data[[attr(x, "time_columns")[1]]]), color = "blue", linetype = "dashed") +
+      scale_color_manual(values = c("Imputed" = "red", "Not Imputed" = "black")) +
+      scale_shape_manual(values = c("Imputed" = 1, "Not Imputed" = 16)) +
+      scale_alpha_manual(values = c("Outlier" = 1, "Not Outlier" = 0.2)) +
+      facet_wrap(~ .data[[attr(x, "country_columns")[1]]], scales = "free_y") +
+      labs(title = paste("Zscore for country", country, " and series", indicator),
+           alpha = "Outlier Indicator",
+           x = x.lab,
+           y = "Zscore") -> zscore_plot
+  }
+
+
+  # Combine the two plots
+  combined_plot <- original_plot / zscore_plot +
+    plot_layout(guides = "collect") & theme(axis.text = element_text(size = 8),
+                                            legend.position = "bottom",
+                                            legend.direction = "horizontal")
+
+  return(combined_plot)
+}
+
+
+#' Function to save the maly_detect object to a file
+#'
+#' @description This function saves the maly_detect object to a file in csv format.
+#'
+#' @param x An object of class maly_detect.
+#' @param file A character string specifying the file path where the object should be saved.
+#' @param top_outliers A integer value indicating whether to save only the top outliers.
+#' #' Default is NULL, which saves all data. If only one method specified, it will use the Zscore
+#' to order the data based on the absolute value of the Zscore. If multiple methods were used,
+#' it will use the \code{outlier_indicator_total} column to order the data.
+#' @param additional_cols A logical value indicating whether to save additional columns in the data frame.
+#' These columns include the original columns, the additional columns from normalize and
+#' the outlier indicator columns.
+#' @param ... Additional arguments to be passed to the write.csv function.
+#'
+#' @return NULL
+#' @export
+write_to_csv <- function(x, file, top_outliers = NULL, additional_cols = FALSE, ...) {
+  # Check if the object is of class maly_detect
+  if (!inherits(x, "maly_detect")) {
+    stop("x must be of class 'maly_detect'.")
+  }
+
+  # Check if the file path is provided
+  if (missing(file)) {
+    stop("Please provide a file path to save the maly_detect object.")
+  }
+
+  # Check if outliers is a numeric value if not null and subset the data
+  if (!is.numeric(top_outliers) && !is.null(top_outliers)) {
+    stop("top_outliers must be a numeric value or NULL.")
+  } else if (!is.null(top_outliers)) {
+    # Subset the data to keep only the top outliers
+    if (length(attr(x, "maly_detect_attr")$method) > 1) {
+      # If multiple methods were used, use the outlier_indicator_total column
+      x <- x[order(-x$outlier_indicator_total), ]
+    } else {
+      # If only one method was used, use the outlier_indicator column
+      x <- x[order(-abs(x$Zscore)), ]
+    }
+    x <- x[1:top_outliers, ]
+  }
+
+  # If additional_cols is FALSE, select only the original columns and the outlier indicator columns
+  if (!additional_cols) {
+    # Get the original columns names
+    .columns <- attr(x, "country_columns")
+    .columns <- c(.columns, attr(x, "time_columns"))
+    .columns <- c(.columns, attr(x, "indicator_columns"))
+    .columns <- c(.columns, attr(x, "value_column"))
+
+    # If multiple methods were used, keep the outlier_indicator_total column
+    if (length(attr(x, "maly_detect_attr")$method) > 1) {
+      .columns <- c(.columns, "outlier_indicator_total")
+    } else {
+      .columns <- c(.columns, "outlier_indicator")
+    }
+
+    # If Imputed column exists, add it to the columns
+    if ("Imputed" %in% colnames(x)) {
+      if (!"Imputed" %in% .columns) {
+        .columns <- c(.columns, "Imputed")
+      }
+    }
+    # Select only the original columns and the outlier indicator columns
+    x <- x[, .columns]
+  }
+
+  # Write the data frame to a csv file
+  write.csv(x, file = file, row.names = FALSE, ...)
+
+  # Return NULL
+  return(NULL)
 }

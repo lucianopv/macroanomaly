@@ -5,16 +5,18 @@
 \title{Function to apply outlier detection}
 \usage{
 detect(
-  .data,
+  .x,
   .method = "zscore",
-  .country_col = c("Country.Code", "Country.Name"),
-  .time_col = "Year",
-  .indicator_col = "Indicator.Code",
+  .country_col = NULL,
+  .time_col = NULL,
+  .indicator_col = NULL,
+  .additional_cols = FALSE,
   ...
 )
 }
 \arguments{
-\item{.data}{A data frame containing the dataset to be analyzed.}
+\item{.x}{An object from the \code{normalize} function, which is a data frame containing the normalized
+data to be analyzed.}
 
 \item{.method}{A single character string or character vector specifying the outlier detection method to be used.
 Options are \code{"zscore"}, \code{"tsoutlier"}, \code{"isotree"}, \code{"outliertree"}, or \code{"capa"}.
@@ -26,12 +28,14 @@ times the IQR (one can change this threhold). \code{"isotree"} applies the \code
 of the \code{outliertree} package to detect outliers. Finally, \code{"capa"} applies the \code{capa} method
 of the \code{anomaly} package to detect point and collective anomalies.}
 
-\item{.country_col}{A character vector specifying the column names for country identifiers. Default is
-\code{c("Country.Code", "Country.Name")}.}
+\item{.country_col}{A character vector specifying the column names for country identifiers. Not needed if these
+are the same as the ones defined for the \code{normalize} function.}
 
-\item{.time_col}{A character string specifying the column name for time identifiers. Default is \code{"Year"}.}
+\item{.time_col}{A character string specifying the column name for time identifiers.Not needed if these are the
+same as the ones defined for the \code{normalize} function.}
 
-\item{.indicator_col}{A character string specifying the column name for indicator identifiers. Default is \code{"Indicator.Code"}.}
+\item{.indicator_col}{A character string specifying the column name for indicator identifiers. Not needed if these
+are the same as the ones defined for the \code{normalize} function.}
 
 \item{...}{Additional arguments to be passed to the specific outlier detection method. See Details
 for arguments for each method.}
@@ -47,8 +51,8 @@ The function supports multiple outlier detection methods:
 \itemize{
 \item \code{"zscore"}: Detects outliers based on Z-scores. The threshold can be adjusted using the \code{.threshold} argument.
 \item \code{"tsoutlier"}: Detects outliers using the IQR method. The threshold can be adjusted using the \code{.threshold} argument.
-\item \code{"isotree"}: Applies the isotree algorithm. The number of dimensions, trees, threads, and threshold can be adjusted using
-the \code{.ndim}, \code{.ntrees}, \code{.nthreads}, and \code{.threshold} arguments, respectively.
+\item \code{"isotree"}: Applies the isotree algorithm. The number of dimensions, trees, threads, sample size, and threshold can be adjusted using
+the \code{.ndim}, \code{.ntrees}, \code{.nthreads}, \code{.sample_size}, and \code{.threshold} arguments, respectively.
 \item \code{"outliertree"}: Applies the outliertree algorithm. The columns to be used for outlier detection can be specified using
 the \code{.cols} argument. The threshold can be adjusted using the \code{.threshold} argument.
 \item \code{"capa"}: Applies the capa method from the anomaly package. The type of anomaly detection can be specified using the

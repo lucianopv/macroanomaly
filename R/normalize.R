@@ -41,9 +41,9 @@ detrend <- function(.data,.year) {
 #' @importFrom lubridate year quarter month
 #' @export
 convert_to_tsibble <- function(.data,
-                               .country_col = c("Country.Code", "Country.Name"),
-                               .time_col = "Year",
-                               .indicator_col = "Indicator.Code",
+                               .country_col,
+                               .time_col,
+                               .indicator_col,
                                .frequency = "yearly",
                                .long_format = TRUE) {
   # Check if the required columns exist in the data
@@ -101,9 +101,9 @@ convert_to_tsibble <- function(.data,
 impute_missing <- function(.data,
                            .value_col,
                            .method = "na_interpolation",
-                           .country_col = c("Country.Code", "Country.Name"),
-                           .time_col = "Year",
-                           .indicator_col = "Indicator.Code",
+                           .country_col,
+                           .time_col,
+                           .indicator_col,
                            ...) {
   # Check if the required columns exist in the data
   if (!all(c(.country_col, .time_col, .indicator_col) %in% colnames(.data))) {
@@ -182,9 +182,9 @@ impute_missing <- function(.data,
 #' @export
 check_missing_countries <- function(.data,
                               .value_col,
-                              .country_col = c("Country.Code", "Country.Name"),
-                              .time_col = "Year",
-                              .indicator_col = "Indicator.Code",
+                              .country_col,
+                              .time_col,
+                              .indicator_col,
                               .min_obs = 2) {
   # Check if the required columns exist in the data
   if (!all(c(.country_col, .time_col) %in% colnames(.data))) {
@@ -289,7 +289,8 @@ decompose_tsibble <- function(.data,
 #' of the column (e.g., "AG.CON.FERT.PT.ZS" or "value").
 #' @param .country_col A character vector specifying the name(s) of the country
 #' identifiers
-#' @param .time_col A character vector specifying the name of the year column.
+#' @param .time_col A character vector specifying the name(s) of the time
+#' identifiers.
 #' @param .indicator_col A character vector specifying the name of the indicator
 #' identifiers.
 #' @param .frequency A character vector specifying the frequency of the time series.
@@ -307,18 +308,20 @@ decompose_tsibble <- function(.data,
 #' Default is TRUE.
 #' @param .keep_decomp A logical value indicating whether to keep the decomposition
 #' components in the output. Default is FALSE.
+#' @param ... Additional arguments to be passed to the imputation function.
+#' See \code{imputeTS} for more details on the different methods.
 #' @return A data frame with the normalized and detrended data.
 #'
 #'
-#' @importFrom collapse fscale fsd fmutate fselect BY pivot frename ftransform get_vars
+#' @importFrom collapse fscale fsd fmutate fselect BY pivot frename ftransform get_vars fungroup
 #' @importFrom imputeTS na_interpolation na_kalman na_mean na_locf na_ma na_seadec na_random
 #' @importFrom tsibble has_gaps fill_gaps
 #' @export
 normalize <- function(.data,
                           .value_col,
-                          .country_col = c("Country.Code", "Country.Name"),
-                          .time_col = "Year",
-                          .indicator_col = "Indicator.Code",
+                          .country_col,
+                          .time_col,
+                          .indicator_col,
                           .frequency = "yearly",
                           .detrend = TRUE,
                           .season = NULL,
@@ -452,5 +455,170 @@ normalize <- function(.data,
     )
   }
 
+  # Ungroup and define new class with grouping columns as attributes
+  .data <- fungroup(.data)
+  attr(.data, "country_columns") <- .country_col
+  attr(.data, "time_columns") <- .time_col
+  attr(.data, "indicator_columns") <- .indicator_col
+  attr(.data, "value_column") <- .value_col
+  attr(.data, "frequency") <- .frequency
+  attr(.data, "detrend") <- .detrend
+  attr(.data, "impute") <- .impute
+  attr(.data, "impute_method") <- .method
+  attr(.data, "season") <- .season
+  attr(.data, "keep_decomp") <- .keep_decomp
+  attr(.data, "long_format") <- .long_format
+  attr(.data, "class") <- c("maly_norm", class(.data))
+
   return(.data)
 }
+
+
+#' Summary method for maly_norm class
+#'
+#' This function prints the summary of the maly_norm object.
+#'
+#' @param x A maly_norm object.
+#' @param ... Additional arguments (not used).
+#'
+#' @export
+#' @method summary maly_norm
+#' @order 1
+summary.maly_norm <- function(x, ...){
+  cat("Macroanomaly Normalized Object\n")
+  cat("Country Columns: ", paste(attr(x, "country_columns"), collapse = ", "), "\n")
+  cat("Total number of countries: ", length(unique(x[[attr(x, "country_columns")[1]]])), "\n")
+  cat("Time Columns: ", paste(attr(x, "time_columns"), collapse = ", "), "\n")
+  cat("Time column from: ", as.character(min(x[[attr(x, "time_columns")[1]]])), " to ", as.character(max(x[[attr(x, "time_columns")[1]]])), "\n")
+  cat("Indicator Columns: ", paste(attr(x, "indicator_columns"), collapse = ", "), "\n")
+  cat("Number of indicators: ", length(unique(x[[attr(x, "indicator_columns")[1]]])), "\n")
+  cat("Value Column: ", attr(x, "value_column"), "\n")
+  cat("Frequency: ", attr(x, "frequency"), "\n")
+  cat("\n")
+  cat("Specified options:\n")
+  cat("Detrend: ", ifelse(attr(x, "detrend"), "TRUE", "FALSE"), "\n")
+  cat("Impute: ", ifelse(attr(x, "impute"), "TRUE", "FALSE"), "\n")
+  cat("Impute Method: ", attr(x, "impute_method"), "\n")
+  cat("Season: ", ifelse(is.null(attr(x, "season")), "NULL", attr(x, "season")), "\n")
+  cat("Keep Decomposition Variables: ", ifelse(attr(x, "keep_decomp"), "TRUE", "FALSE"), "\n")
+  cat("Long Format: ", ifelse(attr(x, "long_format"), "TRUE", "FALSE"), "\n")
+  cat("\n")
+  cat("Data Summary:\n")
+  cat("Summary of: ", attr(x, "value_column"), "\n")
+  print(summary(x[[attr(x, "value_column")]]))
+  cat("\n")
+  cat("Summary of Zscore:\n")
+  print(summary(x$Zscore))
+  cat("\n")
+}
+
+#' Plot method for maly_norm class
+#'
+#' This function plots the original series and the Zscore of the maly_norm object,
+#' for selected country and indicator.
+#'
+#' @param x A maly_norm object.
+#' @param country A character vector specifying the country to plot.
+#' Default is NULL, which means first country in the data will be used.
+#' @param indicator A character vector specifying the indicator to plot.
+#' Default is NULL, which means first indicator in the data will be used.
+#' @param ... Additional arguments to be passed to the plot function.
+#'
+#' @return A ggplot object with the original series and the Zscore of the maly_norm object.
+#'
+#' @importFrom ggplot2 ggplot aes geom_line geom_point labs theme element_text facet_wrap scale_color_manual scale_shape_manual
+#' @importFrom rlang sym
+#' @importFrom collapse fsubset
+#' @importFrom patchwork plot_layout
+#'
+#' @export
+#' @method plot maly_norm
+plot.maly_norm <- function(x, country = NULL, indicator = NULL, ...) {
+  # Check if country and indicator are specified
+  if (is.null(country)) {
+    country <- unique(x[[attr(x, "country_columns")[1]]])[1]
+  }
+  if (is.null(indicator)) {
+    indicator <- unique(x[[attr(x, "indicator_columns")[1]]])[1]
+  }
+
+  # Filter data for the specified country and indicator
+  .data <- x[x[[attr(x, "country_columns")[1]]] %in% country &
+             x[[attr(x, "indicator_columns")[1]]] %in% indicator, ]
+
+  # Check if the data is empty
+  if (nrow(.data) == 0) {
+    stop(paste("No data found for country:", country, "and indicator:", indicator))
+  }
+
+  # Convert time column to Date if it is not already
+  if (!inherits(.data[[attr(x, "time_columns")[1]]], "Date")) {
+    .data[[attr(x, "time_columns")[1]]] <- as.Date(.data[[attr(x, "time_columns")[1]]])
+  }
+
+  # Check if the value column exists
+  if (!attr(x, "value_column") %in% colnames(.data)) {
+    stop(paste("The value column", attr(x, "value_column"), "does not exist in the data."))
+  }
+
+  # Check if the Zscore column exists
+  if (!"Zscore" %in% colnames(.data)) {
+    stop("The Zscore column does not exist in the data. Consider running the normalize function first.")
+  }
+
+  # Relabel Imputed column if it exists
+  if ("Imputed" %in% colnames(.data)) {
+    .data$Imputed <- factor(.data$Imputed, levels = c(TRUE, FALSE), labels = c("Imputed", "Not Imputed"))
+  }
+
+
+
+  # Create the plot based on imputation status
+  if (!"Imputed" %in% colnames(.data)) {
+    ggplot(.data, aes(x = .data[[attr(x, "time_columns")[1]]], y = .data[[attr(x, "value_column")]])) +
+      geom_line() +
+      geom_point() +
+      facet_wrap(~ .data[[attr(x, "country_columns")[1]]], scales = "free_y") +
+      theme(axis.text = element_text(size = 8), legend.position = "bottom") +
+      labs(title = paste("Original Series for country", country, " and series", indicator),
+           x = attr(x, "time_columns")[1],
+           y = attr(x, "value_column")) -> original_plot
+
+    ggplot(.data, aes(x = .data[[attr(x, "time_columns")[1]]], y = Zscore)) +
+      geom_point() +
+      facet_wrap(~ .data[[attr(x, "country_columns")[1]]], scales = "free_y") +
+      theme(axis.text = element_text(size = 8), legend.position = "bottom") +
+      labs(title = paste("Zscore for country", country, " and series", indicator),
+           x = attr(x, "time_columns")[1],
+           y = "Zscore") -> zscore_plot
+  } else{
+    ggplot(.data, aes(x = .data[[attr(x, "time_columns")[1]]], y = .data[[attr(x, "value_column")]])) +
+      geom_line() +
+      geom_point(aes(shape = Imputed, color = Imputed)) +
+      scale_color_manual(values = c("Imputed" = "red", "Not Imputed" = "black")) +
+      scale_shape_manual(values = c("Imputed" = 1, "Not Imputed" = 16)) +
+      facet_wrap(~ .data[[attr(x, "country_columns")[1]]], scales = "free_y") +
+      theme(axis.text = element_text(size = 8), legend.position = "bottom") +
+      labs(title = paste("Original Series for country", country, " and series", indicator),
+           x = attr(x, "time_columns")[1],
+           y = attr(x, "value_column")) -> original_plot
+
+    ggplot(.data, aes(x = .data[[attr(x, "time_columns")[1]]], y = Zscore)) +
+      geom_point(aes(shape = Imputed, color = Imputed)) +
+      scale_color_manual(values = c("Imputed" = "red", "Not Imputed" = "black")) +
+      scale_shape_manual(values = c("Imputed" = 1, "Not Imputed" = 16)) +
+      facet_wrap(~ .data[[attr(x, "country_columns")[1]]], scales = "free_y") +
+      theme(axis.text = element_text(size = 8), legend.position = "bottom") +
+      labs(title = paste("Zscore for country", country, " and series", indicator),
+           x = attr(x, "time_columns")[1],
+           y = "Zscore") -> zscore_plot
+  }
+
+
+  # Combine the two plots
+  combined_plot <- original_plot / zscore_plot +
+    plot_layout(guides = "collect")
+
+  return(combined_plot)
+}
+

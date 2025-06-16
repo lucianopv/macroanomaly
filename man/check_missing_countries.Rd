@@ -7,9 +7,9 @@
 check_missing_countries(
   .data,
   .value_col,
-  .country_col = c("Country.Code", "Country.Name"),
-  .time_col = "Year",
-  .indicator_col = "Indicator.Code",
+  .country_col,
+  .time_col,
+  .indicator_col,
   .min_obs = 2
 )
 }

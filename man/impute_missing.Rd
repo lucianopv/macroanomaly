@@ -8,9 +8,9 @@ impute_missing(
   .data,
   .value_col,
   .method = "na_interpolation",
-  .country_col = c("Country.Code", "Country.Name"),
-  .time_col = "Year",
-  .indicator_col = "Indicator.Code",
+  .country_col,
+  .time_col,
+  .indicator_col,
   ...
 )
 }

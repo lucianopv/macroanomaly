@@ -65,6 +65,7 @@ wdi_data_long_subset |>
                                )) |>
   normalize(.value_col= "Indicator.Value",
             .country_col = c("Country.Code", "Country.Name"),
+            .indicator_col = "Indicator.Code",
             .time_col = "Year",
             .keep_decomp = TRUE,
             .detrend = TRUE,
@@ -83,7 +84,7 @@ tsoutliers_detection(wdi_data_long_subset_norm) |> fungroup() |> fsubset(Country
 capa_detection(wdi_data_long_subset_norm, .min_seg_len = 3)
 
 # With detect function
-detect(wdi_data_long_subset_norm, .method = "zscore")
+detect(wdi_data_long_subset_norm, .method = "zscore") -> wdi_detect_zscore
 
 detect(wdi_data_long_subset_norm, .method = "isotree")
 
@@ -172,15 +173,16 @@ imf_data_long |>
 
 zscore_detection(imf_data_long_subset_norm)
 
-detect(imf_data_long_subset_norm, .method = "zscore")
+detect(imf_data_long_subset_norm, .method = "zscore") -> imf_detect_zscore
 
-detect(imf_data_long_subset_norm, .method = "isotree")
+detect(imf_data_long_subset_norm, .method = "isotree") -> imf_detect_isotree
 
 detect(imf_data_long_subset_norm, .method = "capa",
        .country_col = "Country", .time_col = "TIME_PERIOD", .indicator_col = "variable")
 
-detect(imf_data_long_subset_norm, .method = c("zscore", "capa"),
-       .country_col = "Country", .time_col = "TIME_PERIOD", .indicator_col = "variable")
+detect(imf_data_long_subset_norm, .method = c("zscore", "isotree", "capa"),
+       .additional_cols = TRUE,
+       .country_col = "Country", .time_col = "TIME_PERIOD", .indicator_col = "variable") -> imf_detect_all
 
 imf_data_long_subset_norm |>
   fselect(Country, TIME_PERIOD, value, Zscore, variable, Imputed) |>

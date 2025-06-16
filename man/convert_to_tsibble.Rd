@@ -6,9 +6,9 @@
 \usage{
 convert_to_tsibble(
   .data,
-  .country_col = c("Country.Code", "Country.Name"),
-  .time_col = "Year",
-  .indicator_col = "Indicator.Code",
+  .country_col,
+  .time_col,
+  .indicator_col,
   .frequency = "yearly",
   .long_format = TRUE
 )
