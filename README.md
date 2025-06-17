@@ -7,7 +7,12 @@
 
 <!-- badges: end -->
 
-The goal of macroanomaly is to …
+The goal of `macroanomaly` is to detect anomalies in macroeconomic data
+using various statistical methods. This package provides tools for
+identifying outliers in time series data, particularly focusing on
+macroeconomic indicators. The package includes methods such as Z-score
+normalization, isolation forests, outlier trees, and time series outlier
+detection.
 
 ## Installation
 
@@ -16,36 +21,71 @@ You can install the development version of macroanomaly from
 
 ``` r
 # install.packages("pak")
-pak::pak("davidn10/Anomaly-detection")
+pak::pak("lucianopv/macroanomaly")
 ```
 
 ## Example
 
-This is a basic example which shows you how to solve a common problem:
+A simple example using the World Bank Development Indicators (WDI)
+dataset is provided below. The example demonstrates how to download the
+data, normalize it, and detect anomalies using multiple methods.
 
 ``` r
-## library(macroanomaly)
-## basic example code
+library(macroanomaly)
+library(collapse)
+
+# Load the WDI data
+wdi_download(.path = tempdir()) |>
+  pivot(
+    ids = c("Year", "Country.Name", "Country.Code"),
+    how = "longer",
+    names = list("Indicator.Code", "Indicator.Value")
+    ) |>
+  fsubset(Indicator.Code %in% c("EG.CFT.ACCS.ZS", "NY.GDP.MKTP.CN.AD") & Year > 2005) |>
+  fsubset(!Country.Code %in% c("ABW", "ASM", "BGR", "BMU", "CHI", "CUW", "CYM",
+                               "FRO", "GIB", "GRL", "GUM", "HKG", "IMN", "INX",
+                               "LBN", "LBY", "LIE", "MAC", "MAF", "MNP", "NCL",
+                               "PRI", "PSE", "PYF", "SXM", "TCA", "VGB", "VIR", "XKX", # No data in these countries
+                                 "AFE", "AFW", "ARB", "CEB", "CSS", "EAP", "EAR", "EAS", "ECA", "ECS", "EMU", "EUU",
+                                 "FCS", "HIC", "HPC", "IBD", "IBT", "IDA", "IDB", "IDX", "LAC", "LCN", "LDC", "LIC",
+                                 "LMC", "LMY", "LTE", "MEA", "MIC", "MNA", "NAC", "OED", "OSS", "PRE", "PRK", "PSS",
+                                 "PST", "SAS", "SSA", "SSF", "SST", "TEA", "TEC", "TLA", "TMN", "TSA", "TSS", "UMC", "WLD" # Aggregates without data
+                               )) -> wdi_data_long_subset_filtered
+#> [1] "Checking if file exists and downloading..."
+
+# Normalize the data
+# Normalize the World Bank data
+wdi_data_long_subset_filtered |>
+  normalize(.value_col= "Indicator.Value",
+            .country_col = c("Country.Code", "Country.Name"),
+            .indicator_col = "Indicator.Code",
+            .time_col = "Year",
+            .detrend = TRUE,
+            .impute = TRUE
+            ) -> wdi_data_long_subset_normalized
 ```
 
-What is special about using `README.Rmd` instead of just `README.md`?
-You can include R chunks like so:
+Let’s plot the normalized data to visualize the original values and the
+normalized version of the data which was detrended and imputed (if
+missing):
 
 ``` r
-summary(cars)
-#>      speed           dist       
-#>  Min.   : 4.0   Min.   :  2.00  
-#>  1st Qu.:12.0   1st Qu.: 26.00  
-#>  Median :15.0   Median : 36.00  
-#>  Mean   :15.4   Mean   : 42.98  
-#>  3rd Qu.:19.0   3rd Qu.: 56.00  
-#>  Max.   :25.0   Max.   :120.00
+plot(wdi_data_long_subset_normalized)
 ```
 
-You’ll still need to render `README.Rmd` regularly, to keep `README.md`
-up-to-date. `devtools::build_readme()` is handy for this.
+<img src="man/figures/README-plot-1.png" width="100%" />
 
-You can also embed plots, for example:
+Then we can detect anomalies in the normalized data using multiple
+methods, such as Z-score, isolation forest, and IQR outlier detection:
 
-In that case, don’t forget to commit and push the resulting figure
-files, so they display on GitHub and CRAN.
+``` r
+# Detect anomalies in the World Bank data using multiple methods
+wdi_data_long_subset_normalized |>
+  detect(.method = c("tsoutlier", "isotree", "capa"), .args = list(capa = c(.min_seg_len = 3), isotree = c(.threshold = 0.7))) -> wdi_data_long_multiple_methods
+
+# Plot the results for a specific country and indicator
+plot(wdi_data_long_multiple_methods, country = "BGD", indicator = "EG.CFT.ACCS.ZS",
+     x.lab = "Time", y.lab = "Access to clean fuels for cooking (% of pop.)")
+```
+
+<img src="man/figures/README-pressure-1.png" width="100%" />

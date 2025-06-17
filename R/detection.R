@@ -19,8 +19,10 @@
 #' same as the ones defined for the \code{normalize} function.
 #' @param .indicator_col A character string specifying the column name for indicator identifiers. Not needed if these
 #' are the same as the ones defined for the \code{normalize} function.
-#' @param ... Additional arguments to be passed to the specific outlier detection method. See Details
-#' for arguments for each method.
+#' @param .args A named list of additional arguments to be passed to the specific outlier detection methods. For example,
+#' for \code{"zscore"}, one can specify the threshold using \code{.args = list(zscore = c(.threshold = 2))}. For
+#' multiple methods, the list should contain named lists for each method, e.g.,
+#' \code{.args = list(zscore = c(.threshold = 2), tsoutlier = c(.threshold = 2))}.
 #'
 #' @details
 #' The function supports multiple outlier detection methods:
@@ -48,7 +50,7 @@ detect <- function(.x,
                    .time_col = NULL,
                    .indicator_col = NULL,
                    .additional_cols = FALSE,
-                   ...) {
+                   .args = list()) {
   # Check the input is a data frame and "maly_norm" class
   if (!inherits(.x, "maly_norm") || !is.data.frame(.x)) {
     stop("Input must be a data frame and 'maly' class.")
@@ -85,12 +87,13 @@ detect <- function(.x,
   if (length(.method) == 1) {
     # Call the appropriate detection function based on the method
     results <- switch(.method,
-         zscore = doCall(zscore_detection, .data = .x, ...),
-         tsoutlier = doCall(tsoutliers_detection, .data  = .x, ...),
-         isotree = doCall(isotree_detection, .data  = .x, ...),
-         outliertree = doCall(outliertree_detection, .data = .x, ...),
+         zscore = doCall(zscore_detection, .data = .x, args = .args[["zscore"]]),
+         tsoutlier = doCall(tsoutliers_detection, .data  = .x, args = .args[["tsoutlier"]]),
+         isotree = doCall(isotree_detection, .data  = .x, args = .args[["isotree"]]),
+         outliertree = doCall(outliertree_detection, .data = .x, args = .args[["outliertree"]]),
          capa = doCall(capa_detection, .data = .x, .country_col = .country_col,
-                       .time_col = .time_col, .indicator_col = .indicator_col, ...))
+                       .time_col = .time_col, .indicator_col = .indicator_col, args = .args[["capa"]])
+    )
 
     # If additional columns are specified, select them
     if (!.additional_cols) {
@@ -109,12 +112,12 @@ detect <- function(.x,
       # If multiple methods are specified, apply each method and combine results
       results <- lapply(.method, function(method) {
         switch(method,
-               zscore = doCall(zscore_detection, .data = .x, ...),
-               tsoutlier = doCall(tsoutliers_detection, .data = .x, ...),
-               isotree = doCall(isotree_detection, .data = .x, ...),
-               outliertree = doCall(outliertree_detection, .data = .x, ...),
+               zscore = doCall(zscore_detection, .data = .x, args = .args[["zscore"]]),
+               tsoutlier = doCall(tsoutliers_detection, .data = .x, args = .args[["tsoutlier"]]),
+               isotree = doCall(isotree_detection, .data = .x, args = .args[["isotree"]]),
+               outliertree = doCall(outliertree_detection, .data = .x, args = .args[["outliertree"]]),
                capa = doCall(capa_detection, .data = .x, .country_col = .country_col,
-                             .time_col = .time_col, .indicator_col = .indicator_col, ...)
+                             .time_col = .time_col, .indicator_col = .indicator_col, args = .args[["capa"]])
         )
       })
 
@@ -147,7 +150,7 @@ detect <- function(.x,
       # If .additional_cols is FALSE, select only the original columns and the outlier indicator columns
       # including the outlier_indicator for each method and the outlier_indicator_total
       if (!.additional_cols) {
-        .columns <- c(.country_col, .time_col, .indicator_col, .value_col, outlier_cols, "outlier_indicator_total")
+        .columns <- c(.country_col, .time_col, .indicator_col, .value_col, outlier_cols, "Zscore", "outlier_indicator_total")
         if("Imputed" %in% colnames(.x)) {
           .columns <- c(.columns, "Imputed")
         }
@@ -316,7 +319,7 @@ zscore_detection <- function(.data, .threshold = 3) {
     fungroup() |>
     fmutate(absZscore = abs(Zscore),
             rankZscore = rank(-absZscore),
-            outlier_indicator = as.numeric(absZscore > 3)) |>
+            outlier_indicator = as.numeric(absZscore > .threshold)) |>
     roworder(rankZscore)
 
   return(.data)
@@ -492,16 +495,18 @@ summary.maly_detect <- function(x, ...) {
 
   if (length(method) > 1) {
     # Get the number of countries with outliers
-    n_countries <- length(unique(x[x$outlier_indicator_total == 1, country_cols]))
-    n_indicators <- length(unique(x[x$outlier_indicator_total == 1, indicator_col]))
-    n_time_periods <- length(unique(x[x$outlier_indicator_total == 1, time_col]))
+    n_countries <- length(unique(x[x$outlier_indicator_total > 0, country_cols[1]]))
+    unique_indicators <- unique(x[x$outlier_indicator_total > 0, indicator_col])
+    n_indicators <- length(unique_indicators[!is.na(unique_indicators)])
+    n_time_periods <- length(unique(x[x$outlier_indicator_total > 0, time_col]))
 
     # Get the number of outliers detected
     n_outliers <- sum(x$outlier_indicator_total, na.rm = TRUE)
   } else {
     # Get the number of countries with outliers
-    n_countries <- length(unique(x[x$outlier_indicator == 1, country_cols]))
-    n_indicators <- length(unique(x[x$outlier_indicator == 1, indicator_col]))
+    n_countries <- length(unique(x[x$outlier_indicator == 1, country_cols[1]]))
+    unique_indicators <- unique(x[x$outlier_indicator == 1, indicator_col])
+    n_indicators <- length(unique_indicators[!is.na(unique_indicators)])
     n_time_periods <- length(unique(x[x$outlier_indicator == 1, time_col]))
 
     # Get the number of outliers detected
@@ -511,11 +516,11 @@ summary.maly_detect <- function(x, ...) {
   # Table of outliers per country
   if (n_countries > 0) {
     if(length(method) > 1) {
-      outlier_table <- table(x[x$outlier_indicator_total == 1, country_cols])
+      outlier_table <- table(x[x$outlier_indicator_total > 0, country_cols[1]])
       # Extract the country with most outliers
       most_outliers_country <- names(which.max(outlier_table))
     } else {
-      outlier_table <- table(x[x$outlier_indicator == 1, country_cols])
+      outlier_table <- table(x[x$outlier_indicator == 1, country_cols[1]])
       # Extract the country with most outliers
       most_outliers_country <- names(which.max(outlier_table))
     }
@@ -537,7 +542,7 @@ summary.maly_detect <- function(x, ...) {
   cat(" Information of outliers: \n")
 
   cat("  Number of countries with outliers:", n_countries, "of a total of" ,
-      length(unique(x[[country_cols]])), "countries\n")
+      length(unique(x[[country_cols[1]]])), "countries\n")
   cat("  Number of indicators with outliers:", n_indicators, "of a total of",
       length(unique(x[[indicator_col]])), "indicators\n")
   cat("  Number of time periods with outliers:", n_time_periods, "of a total of",
@@ -689,28 +694,30 @@ plot.maly_detect <- function(x, country = NULL, indicator = NULL, x.lab = NULL, 
   } else{
     ggplot(.data, aes(x = .data[[attr(x, "time_columns")[1]]], y = .data[[attr(x, "value_column")]])) +
       geom_line(alpha = 0.3) +
-      geom_point(aes(shape = Imputed, color = Imputed, alpha = .data[[.detection_col]])) +
+      geom_point(aes(color = Imputed, alpha = .data[[.detection_col]]), show.legend=TRUE) +
       # geom_vline(data = .data_grouped, aes(xintercept = .data[[attr(x, "time_columns")[1]]]), color = "blue", linetype = "dashed") +
-      scale_color_manual(values = c("Imputed" = "red", "Not Imputed" = "black")) +
-      scale_shape_manual(values = c("Imputed" = 1, "Not Imputed" = 16)) +
+      scale_color_manual(values = c("Imputed" = "red", "Not Imputed" = "black"), drop = FALSE) +
+      # scale_shape_manual(values = c("Imputed" = 1, "Not Imputed" = 16)) +
       scale_alpha_manual(values = c("Outlier" = 1, "Not Outlier" = 0.2)) +
       facet_wrap(~ .data[[attr(x, "country_columns")[1]]], scales = "free_y") +
       guides(alpha = "none") +
       theme(axis.text = element_text(size = 8), legend.position = "bottom") +
       labs(title = paste("Original Series for country", country, " and series", indicator),
            alpha = "Outlier Indicator",
+           color = "Imputation Status",
            x = x.lab,
            y = y.lab) -> original_plot
 
     ggplot(.data, aes(x = .data[[attr(x, "time_columns")[1]]], y = Zscore)) +
-      geom_point(aes(shape = Imputed, color = Imputed, alpha = .data[[.detection_col]])) +
+      geom_point(aes(color = Imputed, alpha = .data[[.detection_col]]), show.legend=TRUE) +
       # geom_vline(data = .data_grouped, aes(xintercept = .data[[attr(x, "time_columns")[1]]]), color = "blue", linetype = "dashed") +
-      scale_color_manual(values = c("Imputed" = "red", "Not Imputed" = "black")) +
-      scale_shape_manual(values = c("Imputed" = 1, "Not Imputed" = 16)) +
+      scale_color_manual(values = c("Imputed" = "red", "Not Imputed" = "black"), drop = FALSE) +
+      # scale_shape_manual(values = c("Imputed" = 1, "Not Imputed" = 16)) +
       scale_alpha_manual(values = c("Outlier" = 1, "Not Outlier" = 0.2)) +
       facet_wrap(~ .data[[attr(x, "country_columns")[1]]], scales = "free_y") +
       labs(title = paste("Zscore for country", country, " and series", indicator),
            alpha = "Outlier Indicator",
+           color = "Imputation Status",
            x = x.lab,
            y = "Zscore") -> zscore_plot
   }

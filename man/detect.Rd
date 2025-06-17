@@ -11,7 +11,7 @@ detect(
   .time_col = NULL,
   .indicator_col = NULL,
   .additional_cols = FALSE,
-  ...
+  .args = list()
 )
 }
 \arguments{
@@ -37,8 +37,10 @@ same as the ones defined for the \code{normalize} function.}
 \item{.indicator_col}{A character string specifying the column name for indicator identifiers. Not needed if these
 are the same as the ones defined for the \code{normalize} function.}
 
-\item{...}{Additional arguments to be passed to the specific outlier detection method. See Details
-for arguments for each method.}
+\item{.args}{A named list of additional arguments to be passed to the specific outlier detection methods. For example,
+for \code{"zscore"}, one can specify the threshold using \code{.args = list(zscore = c(.threshold = 2))}. For
+multiple methods, the list should contain named lists for each method, e.g.,
+\code{.args = list(zscore = c(.threshold = 2), tsoutlier = c(.threshold = 2))}.}
 }
 \value{
 A data frame containing the original dataset with additional columns indicating the outlier status.
