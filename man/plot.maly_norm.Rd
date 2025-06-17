@@ -4,7 +4,7 @@
 \alias{plot.maly_norm}
 \title{Plot method for maly_norm class}
 \usage{
-\method{plot}{maly_norm}(x, country = NULL, indicator = NULL, ...)
+\method{plot}{maly_norm}(x, country = NULL, indicator = NULL, x.lab = NULL, y.lab = NULL, ...)
 }
 \arguments{
 \item{x}{A maly_norm object.}
@@ -14,6 +14,12 @@ Default is NULL, which means first country in the data will be used.}
 
 \item{indicator}{A character vector specifying the indicator to plot.
 Default is NULL, which means first indicator in the data will be used.}
+
+\item{x.lab}{A string specifying the label for the x-axis.
+Default is NULL, which means the time column will be used.}
+
+\item{y.lab}{A string specifying the label for the y-axis of the original value (top graph).
+Default is NULL, which means the value column will be used.}
 
 \item{...}{Additional arguments to be passed to the plot function.}
 }

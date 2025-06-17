@@ -4,7 +4,7 @@
 \alias{plot.maly_detect}
 \title{Plot method for maly_detect class}
 \usage{
-\method{plot}{maly_detect}(x, country = NULL, indicator = NULL, ...)
+\method{plot}{maly_detect}(x, country = NULL, indicator = NULL, x.lab = NULL, y.lab = NULL, ...)
 }
 \arguments{
 \item{x}{An object of class maly_detect.}
@@ -12,8 +12,14 @@
 \item{country}{A character vector specifying the country to plot.
 Default is NULL, which means first country in the data will be used.}
 
-\item{indicator}{A character vector specifying the indicator to plot.
-Default is NULL, which means first indicator in the data will be used.}
+\item{indicator}{A string specifying the indicator to plot. Only one per graph.
+Default is NULL, which means the first indicator in the data will be used.}
+
+\item{x.lab}{A string specifying the label for the x-axis.
+Default is NULL, which means the time column will be used.}
+
+\item{y.lab}{A string specifying the label for the y-axis of the original value (top graph).
+Default is NULL, which means the value column will be used.}
 
 \item{...}{Additional arguments to be passed to the plot function.}
 }
