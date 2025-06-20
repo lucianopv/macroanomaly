@@ -4,7 +4,15 @@
 \alias{plot.maly_detect}
 \title{Plot method for maly_detect class}
 \usage{
-\method{plot}{maly_detect}(x, country = NULL, indicator = NULL, x.lab = NULL, y.lab = NULL, ...)
+\method{plot}{maly_detect}(
+  x,
+  country = NULL,
+  indicator = NULL,
+  .total_threshold = NULL,
+  x.lab = NULL,
+  y.lab = NULL,
+  ...
+)
 }
 \arguments{
 \item{x}{An object of class maly_detect.}
@@ -14,6 +22,10 @@ Default is NULL, which means first country in the data will be used.}
 
 \item{indicator}{A string specifying the indicator to plot. Only one per graph.
 Default is NULL, which means the first indicator in the data will be used.}
+
+\item{.total_threshold}{A numeric value specifying the threshold for the total outlier indicator when using
+multiple methods. Default is \code{M-1}, where \code{M} is total number of methods; which means that an
+outlier will be highlighted if it detected by all methods.}
 
 \item{x.lab}{A string specifying the label for the x-axis.
 Default is NULL, which means the time column will be used.}
