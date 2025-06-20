@@ -2,7 +2,8 @@ Package: macroanomaly
 Title: Macroanomaly: Detects outliers in time series
 Version: 0.0.0.9000
 Authors@R: 
-    person("Luciano", "Perfetti Villa", , "lucianopv@gmail.com", role = c("aut", "cre"))
+    c(person("Luciano", "Perfetti Villa", , "lucianopv@gmail.com", role = c("aut", "cre")),
+    person("David", "L. Newhouse", , , role = c("aut", "cre")))
 Description: The goal of `macroanomaly` is to detect anomalies in macroeconomic data using various statistical methods. This package provides tools for identifying outliers in time series data, particularly focusing on macroeconomic indicators. The package includes methods such as Z-score normalization, isolation forests, outlier trees, and time series outlier detection. 
 License: GPL (>= 3)
 Encoding: UTF-8
