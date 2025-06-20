@@ -25,7 +25,8 @@ Imports:
     patchwork,
     rlang,
     imf.data,
-    fabletools
+    fabletools,
+    stringr
 Suggests: 
     knitr,
     rmarkdown,

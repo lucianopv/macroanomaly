@@ -50,7 +50,7 @@ test_that("Check inputs and arguments", {
 
 IFS <- imf.data::load_datasets("IFS")
 imf_data <- IFS$get_series(freq = "Q",
-                           indicator = "NGDP_XDC",
+                           indicator = "LUR_PT",
                            start_period = "2015-01-01",
                            end_period = "2023-12-31")
 

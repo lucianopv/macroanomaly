@@ -1,23 +1,15 @@
-#' Detrend a time series using a smoothing spline
-#'
-#' This function detrends a time series using a smoothing spline.
-#'
-#' @param .data A numeric vector representing the time series data to be detrended.
-#' @param .time A numeric vector representing the time points corresponding to the data.
-#' @return A numeric vector of the same length as .data, containing the detrended values.
-detrend <- function(.data,.year) {
-  Nnonmiss <- fsum(is.finite(.data))
-  output <- rep(NA,length(.data))
-  if (Nnonmiss>0) {
-    S <- supsmu(x = .year, y = .data)
-    .pred <- unlist2d(S$y)
-    output[is.finite(.data)] <- .data[is.finite(.data)] - .pred
-  } else {
-    warning("Inf or NaN values in the data")
-  }
-  return(output)
-}
-
+# global variables
+utils::globalVariables(c(
+  ".gaps",
+  ".model",
+  "Imputed",
+  "Zscore",
+  "Zscore_norm",
+  "Zscore_sd",
+  "trend",
+  "season_adjust",
+  "remainder"
+))
 
 #' Convert data to tsibble
 #'
@@ -486,39 +478,39 @@ normalize <- function(.data,
 #'
 #' This function prints the summary of the maly_norm object.
 #'
-#' @param x A maly_norm object.
+#' @param object A maly_norm object.
 #' @param ... Additional arguments (not used).
 #'
 #' @export
 #' @method summary maly_norm
 #' @order 1
-summary.maly_norm <- function(x, ...){
+summary.maly_norm <- function(object, ...){
   cat("Macroanomaly Normalized Object\n")
-  cat("Country Columns: ", paste(attr(x, "country_columns"), collapse = ", "), "\n")
-  cat("Total number of countries: ", length(unique(x[[attr(x, "country_columns")[1]]])), "\n")
-  cat("Time Columns: ", paste(attr(x, "time_columns"), collapse = ", "), "\n")
-  cat("Time column from: ", as.character(min(x[[attr(x, "time_columns")[1]]])), " to ", as.character(max(x[[attr(x, "time_columns")[1]]])), "\n")
-  cat("Total number of gaps: ", attr(x, "total_gaps"), "\n")
-  cat("Indicator Columns: ", paste(attr(x, "indicator_columns"), collapse = ", "), "\n")
-  cat("Number of indicators: ", length(unique(x[[attr(x, "indicator_columns")[1]]])), "\n")
-  cat("Value Column: ", attr(x, "value_column"), "\n")
-  cat("Total number of missing values: ", attr(x, "total_missing"), "\n")
-  cat("Frequency: ", attr(x, "frequency"), "\n")
+  cat("Country Columns: ", paste(attr(object, "country_columns"), collapse = ", "), "\n")
+  cat("Total number of countries: ", length(unique(object[[attr(object, "country_columns")[1]]])), "\n")
+  cat("Time Columns: ", paste(attr(object, "time_columns"), collapse = ", "), "\n")
+  cat("Time column from: ", as.character(min(object[[attr(object, "time_columns")[1]]])), " to ", as.character(max(object[[attr(object, "time_columns")[1]]])), "\n")
+  cat("Total number of gaps: ", attr(object, "total_gaps"), "\n")
+  cat("Indicator Columns: ", paste(attr(object, "indicator_columns"), collapse = ", "), "\n")
+  cat("Number of indicators: ", length(unique(object[[attr(object, "indicator_columns")[1]]])), "\n")
+  cat("Value Column: ", attr(object, "value_column"), "\n")
+  cat("Total number of missing values: ", attr(object, "total_missing"), "\n")
+  cat("Frequency: ", attr(object, "frequency"), "\n")
   cat("\n")
   cat("Specified options:\n")
-  cat("Detrend: ", ifelse(attr(x, "detrend"), "TRUE", "FALSE"), "\n")
-  cat("Impute: ", ifelse(attr(x, "impute"), "TRUE", "FALSE"), "\n")
-  cat("Impute Method: ", attr(x, "impute_method"), "\n")
-  cat("Season: ", ifelse(is.null(attr(x, "season")), "NULL", attr(x, "season")), "\n")
-  cat("Keep Decomposition Variables: ", ifelse(attr(x, "keep_decomp"), "TRUE", "FALSE"), "\n")
-  cat("Long Format: ", ifelse(attr(x, "long_format"), "TRUE", "FALSE"), "\n")
+  cat("Detrend: ", ifelse(attr(object, "detrend"), "TRUE", "FALSE"), "\n")
+  cat("Impute: ", ifelse(attr(object, "impute"), "TRUE", "FALSE"), "\n")
+  cat("Impute Method: ", attr(object, "impute_method"), "\n")
+  cat("Season: ", ifelse(is.null(attr(object, "season")), "NULL", attr(object, "season")), "\n")
+  cat("Keep Decomposition Variables: ", ifelse(attr(object, "keep_decomp"), "TRUE", "FALSE"), "\n")
+  cat("Long Format: ", ifelse(attr(object, "long_format"), "TRUE", "FALSE"), "\n")
   cat("\n")
   cat("Data Summary:\n")
-  cat("Summary of: ", attr(x, "value_column"), "\n")
-  print(summary(x[[attr(x, "value_column")]]))
+  cat("Summary of: ", attr(object, "value_column"), "\n")
+  print(summary(object[[attr(object, "value_column")]]))
   cat("\n")
   cat("Summary of Zscore:\n")
-  print(summary(x$Zscore))
+  print(summary(object$Zscore))
   cat("\n")
 }
 

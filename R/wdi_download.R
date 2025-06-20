@@ -65,6 +65,9 @@ prepare_csv <- function(.data){
 #' a data frame with the data directory (\code{.prepare = FALSE}), or
 #' a list with the data (either tidy or not) and additional data.frame with the
 #' information provided in \code{.additional = TRUE}.
+#'
+#' @importFrom utils download.file unzip read.csv write.csv
+#'
 #' @export
 wdi_download <- function(.path = tempdir(), .prepare = TRUE, .additional = FALSE){
   # Url to download the CSV files

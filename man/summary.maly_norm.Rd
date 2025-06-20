@@ -4,10 +4,10 @@
 \alias{summary.maly_norm}
 \title{Summary method for maly_norm class}
 \usage{
-\method{summary}{maly_norm}(x, ...)
+\method{summary}{maly_norm}(object, ...)
 }
 \arguments{
-\item{x}{A maly_norm object.}
+\item{object}{A maly_norm object.}
 
 \item{...}{Additional arguments (not used).}
 }

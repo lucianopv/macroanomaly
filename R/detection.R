@@ -1,3 +1,10 @@
+# global variables
+utils::globalVariables(c("Zscore", "outlier_indicator", "Imputed", "outlier_indicator_total",
+                      "absZscore", "rankZscore", "IQR", "lower_bound", "upper_bound",
+                      "outlier_score", "capa_strength", "location", "type",
+                      "strength", "capa_score", "isoforest_score",
+                      "start", "end", "start.lag", "end.lag", "variate"))
+
 #' Function to apply outlier detection
 #'
 #' @description This function applies outlier detection to a given dataset using the specified method.
@@ -340,6 +347,7 @@ zscore_detection <- function(.data, .threshold = 3) {
 #' @return A data frame containing the original dataset with an additional column indicating the outlier status
 #'
 #' @importFrom collapse fungroup fmutate fselect
+#' @importFrom stats IQR quantile
 #' @export
 tsoutliers_detection <- function(.data, .threshold = 3) {
   # Identify outliers based on the IQR method
@@ -364,8 +372,9 @@ tsoutliers_detection <- function(.data, .threshold = 3) {
 #' changes in mean and variance.
 #'
 #' @return A data frame containing the original dataset with an additional column indicating the point anomaly status.
-#' @importFrom anomaly capa
-#' @importFrom collapse fmutate fungroup fselect fgroup_by BY GRP fcumsum na_locf frename join GRPnames unlist2d
+#' @importFrom anomaly capa collective_anomalies point_anomalies
+#' @importFrom collapse fmutate fungroup fselect fgroup_by BY GRP fcumsum frename join GRPnames unlist2d
+#' @importFrom stringr str_split_fixed
 #'
 #' @export
 capa_detection <- function(.data,
@@ -418,16 +427,16 @@ capa_detection <- function(.data,
   names(point_anomalies) <- GRPnames(.grouped_data, sep = "._.")
   point_anomalies <- unlist2d(point_anomalies, idcols = "Indicator")
 
-  .idx_point_anomalies <- as.data.frame(stringr::str_split_fixed(point_anomalies$Indicator, "._.", n = length(c(.country_col, .indicator_col))))
+  .idx_point_anomalies <- as.data.frame(str_split_fixed(point_anomalies$Indicator, "._.", n = length(c(.country_col, .indicator_col))))
   colnames(.idx_point_anomalies) <- c(.country_col, .indicator_col)
   point_anomalies <- cbind(.idx_point_anomalies, point_anomalies[, -1])  # Remove the Indicator column
 
   # Extract the collective anomalies
-  collective_anomalies <- lapply(outliers, anomaly::collective_anomalies)
+  collective_anomalies <- lapply(outliers, collective_anomalies)
   names(collective_anomalies) <- GRPnames(.grouped_data, sep = "._.")
   collective_anomalies <- unlist2d(collective_anomalies, idcols = "Indicator")
 
-  .idx_collective_anomalies <- as.data.frame(stringr::str_split_fixed(collective_anomalies$Indicator, "._.", n = length(c(.country_col, .indicator_col))))
+  .idx_collective_anomalies <- as.data.frame(str_split_fixed(collective_anomalies$Indicator, "._.", n = length(c(.country_col, .indicator_col))))
   colnames(.idx_collective_anomalies) <- c(.country_col, .indicator_col)
   collective_anomalies <- cbind(.idx_collective_anomalies, collective_anomalies[, -1])  # Remove the Indicator column
   collective_anomalies <- fmutate(collective_anomalies, location = start)
@@ -470,59 +479,59 @@ capa_detection <- function(.data,
 #'
 #' @description This function provides a summary of the maly_detect class object.
 #'
-#' @param x An object of class maly_detect.
+#' @param object An object of class maly_detect.
 #' @param ... Additional arguments (not used).
 #'
 #' @export
 #' @method summary maly_detect
 #' @order 1
-summary.maly_detect <- function(x, ...) {
+summary.maly_detect <- function(object, ...) {
   # Check if the object is of class maly_detect
-  if (!inherits(x, "maly_detect")) {
-    stop("x must be of class 'maly_detect'.")
+  if (!inherits(object, "maly_detect")) {
+    stop("object must be of class 'maly_detect'.")
   }
 
   # Get the method used for detection
-  method <- attr(x, "maly_detect_attr")$method
+  method <- attr(object, "maly_detect_attr")$method
 
   # Get the number of rows and columns in the data frame
-  n_rows <- nrow(x)
-  n_cols <- ncol(x)
+  n_rows <- nrow(object)
+  n_cols <- ncol(object)
 
   # Get the columns used for country, time, and indicator
-  country_cols <- attr(x, "country_columns")
-  time_col <- attr(x, "time_columns")
-  indicator_col <- attr(x, "indicator_columns")
+  country_cols <- attr(object, "country_columns")
+  time_col <- attr(object, "time_columns")
+  indicator_col <- attr(object, "indicator_columns")
 
 
   if (length(method) > 1) {
     # Get the number of countries with outliers
-    n_countries <- length(unique(x[x$outlier_indicator_total > 0, country_cols[1]]))
-    unique_indicators <- unique(x[x$outlier_indicator_total > 0, indicator_col])
+    n_countries <- length(unique(object[object$outlier_indicator_total > 0, country_cols[1]]))
+    unique_indicators <- unique(object[object$outlier_indicator_total > 0, indicator_col])
     n_indicators <- length(unique_indicators[!is.na(unique_indicators)])
-    n_time_periods <- length(unique(x[x$outlier_indicator_total > 0, time_col]))
+    n_time_periods <- length(unique(object[object$outlier_indicator_total > 0, time_col]))
 
     # Get the number of outliers detected
-    n_outliers <- sum(x$outlier_indicator_total, na.rm = TRUE)
+    n_outliers <- sum(object$outlier_indicator_total, na.rm = TRUE)
   } else {
     # Get the number of countries with outliers
-    n_countries <- length(unique(x[x$outlier_indicator == 1, country_cols[1]]))
-    unique_indicators <- unique(x[x$outlier_indicator == 1, indicator_col])
+    n_countries <- length(unique(object[object$outlier_indicator == 1, country_cols[1]]))
+    unique_indicators <- unique(object[object$outlier_indicator == 1, indicator_col])
     n_indicators <- length(unique_indicators[!is.na(unique_indicators)])
-    n_time_periods <- length(unique(x[x$outlier_indicator == 1, time_col]))
+    n_time_periods <- length(unique(object[object$outlier_indicator == 1, time_col]))
 
     # Get the number of outliers detected
-    n_outliers <- sum(x$outlier_indicator, na.rm = TRUE)
+    n_outliers <- sum(object$outlier_indicator, na.rm = TRUE)
   }
 
   # Table of outliers per country
   if (n_countries > 0) {
     if(length(method) > 1) {
-      outlier_table <- table(x[x$outlier_indicator_total > 0, country_cols[1]])
+      outlier_table <- table(object[object$outlier_indicator_total > 0, country_cols[1]])
       # Extract the country with most outliers
       most_outliers_country <- names(which.max(outlier_table))
     } else {
-      outlier_table <- table(x[x$outlier_indicator == 1, country_cols[1]])
+      outlier_table <- table(object[object$outlier_indicator == 1, country_cols[1]])
       # Extract the country with most outliers
       most_outliers_country <- names(which.max(outlier_table))
     }
@@ -544,11 +553,11 @@ summary.maly_detect <- function(x, ...) {
   cat(" Information of outliers: \n")
 
   cat("  Number of countries with outliers:", n_countries, "of a total of" ,
-      length(unique(x[[country_cols[1]]])), "countries\n")
+      length(unique(object[[country_cols[1]]])), "countries\n")
   cat("  Number of indicators with outliers:", n_indicators, "of a total of",
-      length(unique(x[[indicator_col]])), "indicators\n")
+      length(unique(object[[indicator_col]])), "indicators\n")
   cat("  Number of time periods with outliers:", n_time_periods, "of a total of",
-      length(unique(x[[time_col]])), "time periods\n")
+      length(unique(object[[time_col]])), "time periods\n")
   cat("  Number of outliers detected:", n_outliers, "\n")
 
   if (n_countries > 0) {

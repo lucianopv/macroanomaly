@@ -4,10 +4,10 @@
 \alias{summary.maly_detect}
 \title{Summary method for maly_detect class}
 \usage{
-\method{summary}{maly_detect}(x, ...)
+\method{summary}{maly_detect}(object, ...)
 }
 \arguments{
-\item{x}{An object of class maly_detect.}
+\item{object}{An object of class maly_detect.}
 
 \item{...}{Additional arguments (not used).}
 }
