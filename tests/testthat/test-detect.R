@@ -1,7 +1,7 @@
 test_that("Check inputs and arguments", {
   IFS <- imf.data::load_datasets("IFS")
   imf_data <- IFS$get_series(freq = "Q",
-                             indicator = "NGDP_XDC",
+                             indicator = "LUR_PT",
                              start_period = "2015-01-01",
                              end_period = "2023-12-31")
 
@@ -90,7 +90,7 @@ test_that("Check isotree detection", {
   imf_detect_isotree <- detect(imf_data_long_subset_norm, .method = "isotree", .additional_cols = TRUE)
 
   expect_s3_class(imf_detect_isotree, "maly_detect")
-  expect_true(all(c("Country", "TIME_PERIOD", "variable", "isoforest_score") %in% colnames(imf_detect_isotree)))
+  expect_true(all(c("Country", "TIME_PERIOD", "variable", "isotree_score") %in% colnames(imf_detect_isotree)))
   expect_true(all((imf_detect_isotree$outlier_score > 0.5) == imf_detect_isotree$outlier_indicator))
 
   imf_detect_isotree_arg <- detect(imf_data_long_subset_norm, .method = "isotree", .args = list(isotree = c(.threshold = 0.7)), .additional_cols = TRUE)
@@ -105,7 +105,7 @@ test_that("Check capa detection", {
   imf_detect_capa <- detect(imf_data_long_subset_norm, .method = "capa", .additional_cols = TRUE)
 
   expect_s3_class(imf_detect_capa, "maly_detect")
-  expect_true(all(c("Country", "TIME_PERIOD", "variable", "capa_score") %in% colnames(imf_detect_capa)))
+  expect_true(all(c("Country", "TIME_PERIOD", "variable", "capa_strength") %in% colnames(imf_detect_capa)))
   expect_true(all((imf_detect_capa$capa_score > 0.5) == imf_detect_capa$outlier_indicator))
 
   imf_detect_capa_arg <- detect(imf_data_long_subset_norm, .method = "capa", .args = list(capa = c(.threshold = 0.7)), .additional_cols = TRUE)

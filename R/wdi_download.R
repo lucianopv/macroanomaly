@@ -1,3 +1,7 @@
+# global variables
+utils::globalVariables(c("Country.Name", "Country.Code", "Indicator.Code", "Indicator.Name", "Year", "value", "Length"))
+
+
 #' Prepare format using the csv file downloaded from WorldBank
 #'
 #' @param .data The data frame to be prepared obtained directly from the CSV file

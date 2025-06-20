@@ -8,7 +8,9 @@ utils::globalVariables(c(
   "Zscore_sd",
   "trend",
   "season_adjust",
-  "remainder"
+  "remainder",
+  "Missing",
+  "Non_missing",
 ))
 
 #' Convert data to tsibble
@@ -225,6 +227,7 @@ check_missing_countries <- function(.data,
 #' @importFrom tsibble has_gaps
 #' @importFrom fabletools model
 #' @importFrom generics components
+#' @importFrom stats as.formula
 #' @export
 decompose_tsibble <- function(.data,
                                .value_col,

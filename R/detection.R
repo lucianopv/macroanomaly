@@ -211,6 +211,7 @@ detect <- function(.x,
 #'
 #' @importFrom isotree isolation.forest predict.isolation_forest
 #' @importFrom collapse fmutate roworder fungroup ftransform ftransformv fselect
+#' @importFrom stats predict
 #' @export
 isotree_detection <- function(.data,
                               .cols = NULL,
