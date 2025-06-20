@@ -199,6 +199,7 @@ detect <- function(.x,
 #' @description This function applies the isotree algorithm to a given dataset for outlier detection.
 #'
 #' @param .data A data frame containing the dataset to be analyzed.
+#' @param .cols A character vector specifying the columns to be used for outlier detection. Default is NULL, which uses all columns.
 #' @param .ndim A numeric value specifying the number of dimensions for the isotree algorithm. Default is 1.
 #' @param .ntrees A numeric value specifying the number of trees to be used in the isotree algorithm. Default is 10.
 #' @param .nthreads A numeric value specifying the number of threads to be used in the isotree algorithm. Default is 2.
@@ -371,6 +372,10 @@ tsoutliers_detection <- function(.data, .threshold = 3) {
 #' @param .type A character string specifying the type of anomaly detection to be used, based on the
 #' capa method in the anomaly package. Default is "meanvar", which is for collective anomalies using joint
 #' changes in mean and variance.
+#' @param .min_seg_len A numeric value specifying the minimum segment length for the capa method. Default is 2.
+#' @param .country_col A character vector specifying the column names for country identifiers.
+#' @param .time_col A character string specifying the column name for time identifiers.
+#' @param .indicator_col A character string specifying the column name for indicator identifiers.
 #'
 #' @return A data frame containing the original dataset with an additional column indicating the point anomaly status.
 #' @importFrom anomaly capa collective_anomalies point_anomalies
@@ -381,9 +386,9 @@ tsoutliers_detection <- function(.data, .threshold = 3) {
 capa_detection <- function(.data,
                            .type = "robustmean",
                            .min_seg_len = 2,
-                           .country_col = c("Country.Code", "Country.Name"),
-                           .time_col = "Year",
-                           .indicator_col = "Indicator.Code") {
+                           .country_col = NULL,
+                           .time_col = NULL,
+                           .indicator_col = NULL) {
   # Check if the anomaly package is installed
   if (!requireNamespace("anomaly", quietly = TRUE)) {
     stop("The anomaly package is required for this function. Please install it.")

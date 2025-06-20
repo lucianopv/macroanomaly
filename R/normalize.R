@@ -77,6 +77,7 @@ convert_to_tsibble <- function(.data,
 #' na_kalman, na_mean, na_locf, na_ma, na_seadec, na_random.
 #'
 #' @param .data A tsibble object containing the data to be imputed.
+#' @param .value_col A character vector specifying the name of the value column.
 #' @param .method A character vector specifying the imputation method to be used.
 #' The default is \code{na_interpolation}. Other options are: na_kalman, na_mean,
 #' na_locf, na_ma, na_seadec, na_random.
@@ -84,6 +85,7 @@ convert_to_tsibble <- function(.data,
 #' identifiers.
 #' @param .time_col A character vector specifying the name(s) of the time
 #' identifiers.
+#' @param .indicator_col A character vector specifying the name(s) of the indicator
 #' @param ... Additional arguments to be passed to the imputation function.
 #' @return A tsibble object with the imputed data and a column identifying the imputed values.
 #'
