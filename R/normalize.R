@@ -10,7 +10,7 @@ utils::globalVariables(c(
   "season_adjust",
   "remainder",
   "Missing",
-  "Non_missing",
+  "Non_missing"
 ))
 
 #' Convert data to tsibble
