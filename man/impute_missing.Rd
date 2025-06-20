@@ -17,6 +17,8 @@ impute_missing(
 \arguments{
 \item{.data}{A tsibble object containing the data to be imputed.}
 
+\item{.value_col}{A character vector specifying the name of the value column.}
+
 \item{.method}{A character vector specifying the imputation method to be used.
 The default is \code{na_interpolation}. Other options are: na_kalman, na_mean,
 na_locf, na_ma, na_seadec, na_random.}
@@ -26,6 +28,8 @@ identifiers.}
 
 \item{.time_col}{A character vector specifying the name(s) of the time
 identifiers.}
+
+\item{.indicator_col}{A character vector specifying the name(s) of the indicator}
 
 \item{...}{Additional arguments to be passed to the imputation function.}
 }

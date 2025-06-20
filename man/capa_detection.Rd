@@ -8,9 +8,9 @@ capa_detection(
   .data,
   .type = "robustmean",
   .min_seg_len = 2,
-  .country_col = c("Country.Code", "Country.Name"),
-  .time_col = "Year",
-  .indicator_col = "Indicator.Code"
+  .country_col = NULL,
+  .time_col = NULL,
+  .indicator_col = NULL
 )
 }
 \arguments{
@@ -19,6 +19,14 @@ capa_detection(
 \item{.type}{A character string specifying the type of anomaly detection to be used, based on the
 capa method in the anomaly package. Default is "meanvar", which is for collective anomalies using joint
 changes in mean and variance.}
+
+\item{.min_seg_len}{A numeric value specifying the minimum segment length for the capa method. Default is 2.}
+
+\item{.country_col}{A character vector specifying the column names for country identifiers.}
+
+\item{.time_col}{A character string specifying the column name for time identifiers.}
+
+\item{.indicator_col}{A character string specifying the column name for indicator identifiers.}
 }
 \value{
 A data frame containing the original dataset with an additional column indicating the point anomaly status.
