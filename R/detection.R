@@ -19,6 +19,7 @@
 #' same as the ones defined for the \code{normalize} function.
 #' @param .indicator_col A character string specifying the column name for indicator identifiers. Not needed if these
 #' are the same as the ones defined for the \code{normalize} function.
+#' @param .additional_cols A logical value indicating whether to include additional columns in the output data frame.
 #' @param .args A named list of additional arguments to be passed to the specific outlier detection methods. For example,
 #' for \code{"zscore"}, one can specify the threshold using \code{.args = list(zscore = c(.threshold = 2))}. For
 #' multiple methods, the list should contain named lists for each method, e.g.,
@@ -53,7 +54,7 @@ detect <- function(.x,
                    .args = list()) {
   # Check the input is a data frame and "maly_norm" class
   if (!inherits(.x, "maly_norm") || !is.data.frame(.x)) {
-    stop("Input must be a data frame and 'maly' class.")
+    stop("Input must be a data frame and 'maly_norm' class.")
   }
 
 
@@ -455,7 +456,8 @@ capa_detection <- function(.data,
     fmutate(start = collapse::na_locf(start),
             end = collapse::na_locf(end),
             outlier_indicator = ifelse(!is.na(start) & !is.na(end) & location >= start & location <= end, 1, outlier_indicator),
-            type = ifelse(location >= start & location <= end, "collective", type)) |>
+            type = ifelse(location >= start & location <= end, "collective", type),
+            type = ifelse(is.na(type) & !is.na(capa_strength), "point", type )) |>
     fselect(-c(start, end, location, start.lag, end.lag, variate))
 
   # TODO: What do we want to keep?
@@ -568,6 +570,9 @@ summary.maly_detect <- function(x, ...) {
 #' Default is NULL, which means first country in the data will be used.
 #' @param indicator A string specifying the indicator to plot. Only one per graph.
 #' Default is NULL, which means the first indicator in the data will be used.
+#' @param .total_threshold A numeric value specifying the threshold for the total outlier indicator when using
+#' multiple methods. Default is \code{M-1}, where \code{M} is total number of methods; which means that an
+#' outlier will be highlighted if it detected by all methods.
 #' @param x.lab A string specifying the label for the x-axis.
 #' Default is NULL, which means the time column will be used.
 #' @param y.lab A string specifying the label for the y-axis of the original value (top graph).
@@ -584,7 +589,7 @@ summary.maly_detect <- function(x, ...) {
 #'
 #' @export
 #' @method plot maly_detect
-plot.maly_detect <- function(x, country = NULL, indicator = NULL, x.lab = NULL, y.lab = NULL, ...) {
+plot.maly_detect <- function(x, country = NULL, indicator = NULL, .total_threshold = NULL, x.lab = NULL, y.lab = NULL, ...) {
   # Check if country and indicator are specified
   if (is.null(indicator)) {
     indicator <- unique(x[[attr(x, "indicator_columns")[1]]])[1]
@@ -636,10 +641,15 @@ plot.maly_detect <- function(x, country = NULL, indicator = NULL, x.lab = NULL, 
     .data$Imputed <- factor(.data$Imputed, levels = c(TRUE, FALSE), labels = c("Imputed", "Not Imputed"))
   }
 
+  # Check if .total_threshold is specified, if not, set it to M-1
+  if (is.null(.total_threshold)) {
+    .total_threshold <- length(attr(x, "maly_detect_attr")$method) - 1
+  }
+
   # Check if multiple methods were used
   if (length(attr(x, "maly_detect_attr")$method) > 1) {
     .detection_col <- "outlier_indicator_total"
-    .data[[.detection_col]] <- ifelse(.data[[.detection_col]] > 0, "Outlier", "Not Outlier")
+    .data[[.detection_col]] <- ifelse(.data[[.detection_col]] > .total_threshold, "Outlier", "Not Outlier")
     .data[[.detection_col]] <- factor(.data[[.detection_col]], levels = c("Outlier", "Not Outlier"))
 
     # Summarise by country and indicator the time periods with outliers

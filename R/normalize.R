@@ -336,7 +336,7 @@ normalize <- function(.data,
   }
 
   # Check if the value column exists
-  if (!.value_col %in% colnames(.data)) {
+  if (any(!.value_col %in% colnames(.data))) {
     stop("The specified value column does not exist in the data.")
   }
 
