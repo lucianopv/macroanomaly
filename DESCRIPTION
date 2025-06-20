@@ -23,7 +23,8 @@ Imports:
     lubridate,
     outliertree,
     patchwork,
-    rlang
+    rlang,
+    imf.data
 Suggests: 
     knitr,
     rmarkdown,
