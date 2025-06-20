@@ -90,7 +90,7 @@ test_that("Check isotree detection", {
   imf_detect_isotree <- detect(imf_data_long_subset_norm, .method = "isotree", .additional_cols = TRUE)
 
   expect_s3_class(imf_detect_isotree, "maly_detect")
-  expect_true(all(c("Country", "TIME_PERIOD", "variable", "isotree_score") %in% colnames(imf_detect_isotree)))
+  expect_true(all(c("Country", "TIME_PERIOD", "variable", "outlier_score") %in% colnames(imf_detect_isotree)))
   expect_true(all((imf_detect_isotree$outlier_score > 0.5) == imf_detect_isotree$outlier_indicator))
 
   imf_detect_isotree_arg <- detect(imf_data_long_subset_norm, .method = "isotree", .args = list(isotree = c(.threshold = 0.7)), .additional_cols = TRUE)
