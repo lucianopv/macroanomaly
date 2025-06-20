@@ -24,7 +24,8 @@ Imports:
     outliertree,
     patchwork,
     rlang,
-    imf.data
+    imf.data,
+    fabletools
 Suggests: 
     knitr,
     rmarkdown,
