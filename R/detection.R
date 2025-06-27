@@ -26,6 +26,8 @@ utils::globalVariables(c("Zscore", "outlier_indicator", "Imputed", "outlier_indi
 #' same as the ones defined for the \code{normalize} function.
 #' @param .indicator_col A character string specifying the column name for indicator identifiers. Not needed if these
 #' are the same as the ones defined for the \code{normalize} function.
+#' @param .value_col A character string specifying the column name for value identifiers. Not needed if these are the
+#' same as the ones defined for the \code{normalize} function.
 #' @param .additional_cols A logical value indicating whether to include additional columns in the output data frame.
 #' @param .args A named list of additional arguments to be passed to the specific outlier detection methods. For example,
 #' for \code{"zscore"}, one can specify the threshold using \code{.args = list(zscore = c(.threshold = 2))}. For
@@ -57,22 +59,23 @@ detect <- function(.x,
                    .country_col = NULL,
                    .time_col = NULL,
                    .indicator_col = NULL,
+                   .value_col = NULL,
                    .additional_cols = FALSE,
                    .args = list()) {
   # Check the input is a data frame and "maly_norm" class
   if (!inherits(.x, "maly_norm") || !is.data.frame(.x)) {
-    stop("Input must be a data frame and 'maly_norm' class.")
+    stop("Input must be a data frame and 'maly_norm' class.", call. = FALSE)
   }
 
 
   # Check if the method is valid
   valid_methods <- c("zscore", "tsoutlier", "isotree", "outliertree", "capa")
   if (!any(.method %in% valid_methods)) {
-    stop(paste("Invalid method specified. Choose from:", paste(valid_methods, collapse = ", ")))
+    stop(paste("Invalid method specified. Choose from:", paste(valid_methods, collapse = ", ")), call. = FALSE)
   }
 
-  # Define .country_col, .time_col and .indicator_col using the attribute if values are NULL
-  if (any(is.null(c(.country_col, .time_col, .indicator_col)))){
+  # Define .country_col, .value_col, .time_col and .indicator_col using the attribute if values are NULL
+  if (any(is.null(c(.country_col, .time_col, .indicator_col, .value_col)))){
     if (is.null(.country_col)) {
       .country_col <- attr(.x, "country_columns", exact = TRUE)
     }
@@ -82,6 +85,9 @@ detect <- function(.x,
     if (is.null(.indicator_col)) {
       .indicator_col <- attr(.x, "indicator_columns", exact = TRUE)
     }
+    if (is.null(.value_col)) {
+      .value_col <- attr(.x, "value_column", exact = TRUE)
+    }
   }
 
   # Define the value column
@@ -89,7 +95,7 @@ detect <- function(.x,
 
   # Check if the required columns exist in the data
   if (!all(c(.country_col, .time_col, .indicator_col) %in% colnames(.x))) {
-    stop("One or more specified columns do not exist in the data frame.")
+    stop("One or more specified columns do not exist in the data frame.", call. = FALSE)
   }
 
   if (length(.method) == 1) {
@@ -98,7 +104,7 @@ detect <- function(.x,
          zscore = doCall(zscore_detection, .data = .x, args = .args[["zscore"]]),
          tsoutlier = doCall(tsoutliers_detection, .data  = .x, args = .args[["tsoutlier"]]),
          isotree = doCall(isotree_detection, .data  = .x, args = .args[["isotree"]]),
-         outliertree = doCall(outliertree_detection, .data = .x, args = .args[["outliertree"]]),
+         outliertree = doCall(outliertree_detection, .data = .x, .value_col = .value_col, args = .args[["outliertree"]]),
          capa = doCall(capa_detection, .data = .x, .country_col = .country_col,
                        .time_col = .time_col, .indicator_col = .indicator_col, args = .args[["capa"]])
     )
@@ -223,7 +229,7 @@ isotree_detection <- function(.data,
                               .threshold = 0.5, ...) {
   # Check if the isotree package is installed
   if (!requireNamespace("isotree", quietly = TRUE)) {
-    stop("The isotree package is required for this function. Please install it.")
+    stop("The isotree package is required for this function. Please install it.", call. = FALSE)
   }
 
   # If .cols is NULL, select columns specified
@@ -282,25 +288,86 @@ isotree_detection <- function(.data,
 #' @importFrom outliertree outlier.tree
 #' @importFrom collapse fmutate roworder fungroup
 #' @export
-outliertree_detection <- function(.data, .cols = NULL, .threshold = 0.5, .save_outliers = TRUE, .nthreads = 2, ...) {
+outliertree_detection <- function(.data, .cols = NULL, .value_col = NULL, .threshold = 0.5, .save_outliers = TRUE, .nthreads = 2, ...) {
   # Check if the outliertree package is installed
   if (!requireNamespace("outliertree", quietly = TRUE)) {
-    stop("The outliertree package is required for this function. Please install it.")
+    stop("The outliertree package is required for this function. Please install it.", call. = FALSE)
   }
+
+  # Save the order of columns in the original data
+  .original_cols_ord <- colnames(.data)
 
   # If .cols is not NULL, select columns specified
   if (!is.null(.cols)){
+    # Check if Zscore is included in .cols, if not, add it and warn the user
+    if (!"Zscore" %in% .cols) {
+      warning("Zscore column is not included in .cols. It will be added automatically.", call. = FALSE)
+      .cols <- c(.cols, "Zscore")
+    }
+
+    # Check if the .value_col is included in .cols, if it is, remove it and warn the user
+    if (!is.null(.value_col) && .value_col %in% .cols) {
+      warning(paste("It is not recommended that column", .value_col, "is included in the outlier detection. It will be excluded from the analysis."), call. = FALSE)
+      .cols <- .cols[!(.cols %in% .value_col)]
+    }
+
+    # Select the non-selected columns for further join
+    .original_cols <- colnames(.data)[!colnames(.data) %in% .cols]
+    .original_data <- .data[, .original_cols, drop = FALSE]
+
     .data <- .data |>
       fselect(.cols)
+  } else {
+    # Exclude the .value_col if it exists in the data and warn the user
+    if (!is.null(.value_col) && .value_col %in% colnames(.data)) {
+      warning(paste("The column", .value_col, "is not included in the outlier detection. It will be excluded from the analysis."), call. = FALSE)
+      .data <- .data |>
+        fselect(-.value_col)
+    }
   }
 
   .data <- fungroup(.data)
 
+  # Check if any column is class "vctrs_vctr", if so, change it to Date
+  if (any(sapply(.data, function(x) inherits(x, "vctrs_vctr")))) {
+    # Obtain index of column with class "vctrs_vctr"
+    vctrs_col_index <- which(sapply(.data, function(x) inherits(x, "vctrs_vctr")))
+    .original_time <- .data[, vctrs_col_index]
+    .data <- .data |>
+      ftransformv(vctrs_col_index, as.Date)
+
+  }
+
   # Apply the outliertree algorithm
-  model <- outliertree::outlier.tree(.data, save_outliers = .save_outliers, nthreads = .nthreads, ...)
+  capture.output(invisible(model <- outliertree::outlier.tree(.data, save_outliers = .save_outliers, nthreads = .nthreads, ...)))
 
   # Predict outlier scores
+  cat("Message from outliertree:\n")
   outlier_scores <- predict(model, .data)
+
+  # Check the outlier_score within each object in the list outlier_scores
+  # If NA, then no outliers were detected and create a vector of zeros
+  if (all(unlist(lapply(outlier_scores, \(x) is.na(x$outlier_score))))) {
+    outlier_scores <- rep(0, nrow(.data))
+  } else {
+    # If not NA, extract the outlier scores
+    outlier_scores <- unlist(lapply(outlier_scores, function(x) x$outlier_score))
+    outlier_scores <- ifelse(!is.na(outlier_scores), 1, 0)
+  }
+
+  # If .cols is not NULL, join the original data with the outlier scores
+  if (!is.null(.cols)) {
+    # Join the original data with the outlier scores
+    .data <- cbind(.original_data, .data)
+  }
+
+  # If the original data was a vctrs_vctr, replace the transformed dates with the original ones
+  if (exists(".original_time")) {
+    .data[, names(vctrs_col_index)] <- .original_time
+  }
+
+  # Order the columns in the original order
+  .data <- .data[, .original_cols_ord, drop = FALSE]
 
   # Create a data frame with the original dataset and outlier scores
   .data <- .data |>
@@ -391,12 +458,12 @@ capa_detection <- function(.data,
                            .indicator_col = NULL) {
   # Check if the anomaly package is installed
   if (!requireNamespace("anomaly", quietly = TRUE)) {
-    stop("The anomaly package is required for this function. Please install it.")
+    stop("The anomaly package is required for this function. Please install it.", call. = FALSE)
   }
 
   # Check columns exist
   if (!all(c(.country_col, .time_col, .indicator_col) %in% colnames(.data))) {
-    stop("One or more specified columns do not exist in the data frame.")
+    stop("One or more specified columns do not exist in the data frame.", call. = FALSE)
   }
 
   # Check if the .type argument is valid
@@ -407,7 +474,7 @@ capa_detection <- function(.data,
 
   # Check for missing values, remove them and alert the user
   if (any(is.na(.data$Zscore))) {
-    warning("Missing values found in Zscore column. These will be removed from the analysis.")
+    warning("Missing values found in Zscore column. These will be removed from the analysis.", call. = FALSE)
     .data_sub <- .data |> fungroup() |> fsubset(!is.na(Zscore))
   } else {
     .data_sub <- .data
@@ -427,7 +494,7 @@ capa_detection <- function(.data,
   point_anomalies <- lapply(outliers, \(x)
                             tryCatch(anomaly::point_anomalies(x),
                                    error = function(e) {
-                                     warning("Error in detecting point anomalies: ", e$message)
+                                     warning("Error in detecting point anomalies: ", e$message, call. = FALSE)
                                      return(data.frame(location = NA, variate = NA, strength = NA))
                                    }))
   names(point_anomalies) <- GRPnames(.grouped_data, sep = "._.")
@@ -494,7 +561,7 @@ capa_detection <- function(.data,
 summary.maly_detect <- function(object, ...) {
   # Check if the object is of class maly_detect
   if (!inherits(object, "maly_detect")) {
-    stop("object must be of class 'maly_detect'.")
+    stop("object must be of class 'maly_detect'.", call. = FALSE)
   }
 
   # Get the method used for detection
@@ -621,12 +688,12 @@ plot.maly_detect <- function(x, country = NULL, indicator = NULL, .total_thresho
 
   # Check if the data is empty
   if (nrow(.data) == 0) {
-    stop(paste("No data found for country:", country, "and indicator:", indicator))
+    stop(paste("No data found for country:", country, "and indicator:", indicator), call. = FALSE)
   }
 
   # Check if the time column exists
   if (!attr(x, "time_columns")[1] %in% colnames(.data)) {
-    stop(paste("The time column", attr(x, "time_columns")[1], "does not exist in the data."))
+    stop(paste("The time column", attr(x, "time_columns")[1], "does not exist in the data."), call. = FALSE)
   }
 
   # Check if the frequency is yearly or not
@@ -643,12 +710,12 @@ plot.maly_detect <- function(x, country = NULL, indicator = NULL, .total_thresho
 
   # Check if the value column exists
   if (!attr(x, "value_column") %in% colnames(.data)) {
-    stop(paste("The value column", attr(x, "value_column"), "does not exist in the data."))
+    stop(paste("The value column", attr(x, "value_column"), "does not exist in the data."), call. = FALSE)
   }
 
   # Check if the Zscore column exists
   if (!"Zscore" %in% colnames(.data)) {
-    stop("The Zscore column does not exist in the data. Consider running the normalize function first.")
+    stop("The Zscore column does not exist in the data. Consider running the normalize function first.", call. = FALSE)
   }
 
   # Relabel Imputed column if it exists
@@ -783,12 +850,12 @@ write_to_csv <- function(x, file, top_outliers = NULL, additional_cols = FALSE, 
 
   # Check if the file path is provided
   if (missing(file)) {
-    stop("Please provide a file path to save the maly_detect object.")
+    stop("Please provide a file path to save the maly_detect object.", call. = FALSE)
   }
 
   # Check if outliers is a numeric value if not null and subset the data
   if (!is.numeric(top_outliers) && !is.null(top_outliers)) {
-    stop("top_outliers must be a numeric value or NULL.")
+    stop("top_outliers must be a numeric value or NULL.", call. = FALSE)
   } else if (!is.null(top_outliers)) {
     # Subset the data to keep only the top outliers
     if (length(attr(x, "maly_detect_attr")$method) > 1) {
