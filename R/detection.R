@@ -732,7 +732,7 @@ plot.maly_detect <- function(x, country = NULL, indicator = NULL, .total_thresho
   # Check if multiple methods were used
   if (length(attr(x, "maly_detect_attr")$method) > 1) {
     .detection_col <- "outlier_indicator_total"
-    .data[[.detection_col]] <- ifelse(.data[[.detection_col]] > .total_threshold, "Outlier", "Not Outlier")
+    .data[[.detection_col]] <- ifelse(.data[[.detection_col]] >= .total_threshold, "Outlier", "Not Outlier")
     .data[[.detection_col]] <- factor(.data[[.detection_col]], levels = c("Outlier", "Not Outlier"))
 
     # Summarise by country and indicator the time periods with outliers

@@ -22,7 +22,12 @@ You can install the development version of macroanomaly from
 
 ``` r
 # install.packages("pak")
-pak::pak("lucianopv/macroanomaly")
+# pak::pak("lucianopv/macroanomaly")
+# install.packages("devtools")
+devtools::install_github("lucianopv/macroanomaly", dependencies = TRUE, build_vignettes = TRUE)
+# Alternatively, you can use remotes package
+# install.packages("remotes")
+# remotes::install_github("lucianopv/macroanomaly", dependencies = TRUE, build_vignettes = TRUE)
 ```
 
 ## Example
@@ -85,7 +90,7 @@ wdi_data_long_subset_normalized |>
   detect(.method = c("tsoutlier", "isotree", "capa"), .args = list(capa = c(.min_seg_len = 3), isotree = c(.threshold = 0.7))) -> wdi_data_long_multiple_methods
 
 # Plot the results for a specific country and indicator
-plot(wdi_data_long_multiple_methods, country = "BGD", indicator = "EG.CFT.ACCS.ZS",
+plot(wdi_data_long_multiple_methods, country = "ECU", indicator = "EG.CFT.ACCS.ZS",.total_threshold = 2,
      x.lab = "Time", y.lab = "Access to clean fuels for cooking (% of pop.)")
 ```
 
