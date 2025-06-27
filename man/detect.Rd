@@ -37,6 +37,8 @@ same as the ones defined for the \code{normalize} function.}
 \item{.indicator_col}{A character string specifying the column name for indicator identifiers. Not needed if these
 are the same as the ones defined for the \code{normalize} function.}
 
+\item{.additional_cols}{A logical value indicating whether to include additional columns in the output data frame.}
+
 \item{.args}{A named list of additional arguments to be passed to the specific outlier detection methods. For example,
 for \code{"zscore"}, one can specify the threshold using \code{.args = list(zscore = c(.threshold = 2))}. For
 multiple methods, the list should contain named lists for each method, e.g.,

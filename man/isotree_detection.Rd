@@ -18,6 +18,8 @@ isotree_detection(
 \arguments{
 \item{.data}{A data frame containing the dataset to be analyzed.}
 
+\item{.cols}{A character vector specifying the columns to be used for outlier detection. Default is NULL, which uses all columns.}
+
 \item{.ndim}{A numeric value specifying the number of dimensions for the isotree algorithm. Default is 1.}
 
 \item{.ntrees}{A numeric value specifying the number of trees to be used in the isotree algorithm. Default is 10.}

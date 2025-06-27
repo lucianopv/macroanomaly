@@ -1,3 +1,10 @@
+# global variables
+utils::globalVariables(c("Zscore", "outlier_indicator", "Imputed", "outlier_indicator_total",
+                      "absZscore", "rankZscore", "IQR", "lower_bound", "upper_bound",
+                      "outlier_score", "capa_strength", "location", "type",
+                      "strength", "capa_score", "isoforest_score",
+                      "start", "end", "start.lag", "end.lag", "variate"))
+
 #' Function to apply outlier detection
 #'
 #' @description This function applies outlier detection to a given dataset using the specified method.
@@ -19,6 +26,7 @@
 #' same as the ones defined for the \code{normalize} function.
 #' @param .indicator_col A character string specifying the column name for indicator identifiers. Not needed if these
 #' are the same as the ones defined for the \code{normalize} function.
+#' @param .additional_cols A logical value indicating whether to include additional columns in the output data frame.
 #' @param .args A named list of additional arguments to be passed to the specific outlier detection methods. For example,
 #' for \code{"zscore"}, one can specify the threshold using \code{.args = list(zscore = c(.threshold = 2))}. For
 #' multiple methods, the list should contain named lists for each method, e.g.,
@@ -53,7 +61,7 @@ detect <- function(.x,
                    .args = list()) {
   # Check the input is a data frame and "maly_norm" class
   if (!inherits(.x, "maly_norm") || !is.data.frame(.x)) {
-    stop("Input must be a data frame and 'maly' class.")
+    stop("Input must be a data frame and 'maly_norm' class.")
   }
 
 
@@ -191,6 +199,7 @@ detect <- function(.x,
 #' @description This function applies the isotree algorithm to a given dataset for outlier detection.
 #'
 #' @param .data A data frame containing the dataset to be analyzed.
+#' @param .cols A character vector specifying the columns to be used for outlier detection. Default is NULL, which uses all columns.
 #' @param .ndim A numeric value specifying the number of dimensions for the isotree algorithm. Default is 1.
 #' @param .ntrees A numeric value specifying the number of trees to be used in the isotree algorithm. Default is 10.
 #' @param .nthreads A numeric value specifying the number of threads to be used in the isotree algorithm. Default is 2.
@@ -203,6 +212,7 @@ detect <- function(.x,
 #'
 #' @importFrom isotree isolation.forest predict.isolation_forest
 #' @importFrom collapse fmutate roworder fungroup ftransform ftransformv fselect
+#' @importFrom stats predict
 #' @export
 isotree_detection <- function(.data,
                               .cols = NULL,
@@ -339,6 +349,7 @@ zscore_detection <- function(.data, .threshold = 3) {
 #' @return A data frame containing the original dataset with an additional column indicating the outlier status
 #'
 #' @importFrom collapse fungroup fmutate fselect
+#' @importFrom stats IQR quantile
 #' @export
 tsoutliers_detection <- function(.data, .threshold = 3) {
   # Identify outliers based on the IQR method
@@ -361,18 +372,23 @@ tsoutliers_detection <- function(.data, .threshold = 3) {
 #' @param .type A character string specifying the type of anomaly detection to be used, based on the
 #' capa method in the anomaly package. Default is "meanvar", which is for collective anomalies using joint
 #' changes in mean and variance.
+#' @param .min_seg_len A numeric value specifying the minimum segment length for the capa method. Default is 2.
+#' @param .country_col A character vector specifying the column names for country identifiers.
+#' @param .time_col A character string specifying the column name for time identifiers.
+#' @param .indicator_col A character string specifying the column name for indicator identifiers.
 #'
 #' @return A data frame containing the original dataset with an additional column indicating the point anomaly status.
-#' @importFrom anomaly capa
-#' @importFrom collapse fmutate fungroup fselect fgroup_by BY GRP fcumsum na_locf frename join GRPnames unlist2d
+#' @importFrom anomaly capa collective_anomalies point_anomalies
+#' @importFrom collapse fmutate fungroup fselect fgroup_by BY GRP fcumsum frename join GRPnames unlist2d
+#' @importFrom stringr str_split_fixed
 #'
 #' @export
 capa_detection <- function(.data,
                            .type = "robustmean",
                            .min_seg_len = 2,
-                           .country_col = c("Country.Code", "Country.Name"),
-                           .time_col = "Year",
-                           .indicator_col = "Indicator.Code") {
+                           .country_col = NULL,
+                           .time_col = NULL,
+                           .indicator_col = NULL) {
   # Check if the anomaly package is installed
   if (!requireNamespace("anomaly", quietly = TRUE)) {
     stop("The anomaly package is required for this function. Please install it.")
@@ -417,16 +433,16 @@ capa_detection <- function(.data,
   names(point_anomalies) <- GRPnames(.grouped_data, sep = "._.")
   point_anomalies <- unlist2d(point_anomalies, idcols = "Indicator")
 
-  .idx_point_anomalies <- as.data.frame(stringr::str_split_fixed(point_anomalies$Indicator, "._.", n = length(c(.country_col, .indicator_col))))
+  .idx_point_anomalies <- as.data.frame(str_split_fixed(point_anomalies$Indicator, "._.", n = length(c(.country_col, .indicator_col))))
   colnames(.idx_point_anomalies) <- c(.country_col, .indicator_col)
   point_anomalies <- cbind(.idx_point_anomalies, point_anomalies[, -1])  # Remove the Indicator column
 
   # Extract the collective anomalies
-  collective_anomalies <- lapply(outliers, anomaly::collective_anomalies)
+  collective_anomalies <- lapply(outliers, collective_anomalies)
   names(collective_anomalies) <- GRPnames(.grouped_data, sep = "._.")
   collective_anomalies <- unlist2d(collective_anomalies, idcols = "Indicator")
 
-  .idx_collective_anomalies <- as.data.frame(stringr::str_split_fixed(collective_anomalies$Indicator, "._.", n = length(c(.country_col, .indicator_col))))
+  .idx_collective_anomalies <- as.data.frame(str_split_fixed(collective_anomalies$Indicator, "._.", n = length(c(.country_col, .indicator_col))))
   colnames(.idx_collective_anomalies) <- c(.country_col, .indicator_col)
   collective_anomalies <- cbind(.idx_collective_anomalies, collective_anomalies[, -1])  # Remove the Indicator column
   collective_anomalies <- fmutate(collective_anomalies, location = start)
@@ -455,7 +471,8 @@ capa_detection <- function(.data,
     fmutate(start = collapse::na_locf(start),
             end = collapse::na_locf(end),
             outlier_indicator = ifelse(!is.na(start) & !is.na(end) & location >= start & location <= end, 1, outlier_indicator),
-            type = ifelse(location >= start & location <= end, "collective", type)) |>
+            type = ifelse(location >= start & location <= end, "collective", type),
+            type = ifelse(is.na(type) & !is.na(capa_strength), "point", type )) |>
     fselect(-c(start, end, location, start.lag, end.lag, variate))
 
   # TODO: What do we want to keep?
@@ -468,59 +485,59 @@ capa_detection <- function(.data,
 #'
 #' @description This function provides a summary of the maly_detect class object.
 #'
-#' @param x An object of class maly_detect.
+#' @param object An object of class maly_detect.
 #' @param ... Additional arguments (not used).
 #'
 #' @export
 #' @method summary maly_detect
 #' @order 1
-summary.maly_detect <- function(x, ...) {
+summary.maly_detect <- function(object, ...) {
   # Check if the object is of class maly_detect
-  if (!inherits(x, "maly_detect")) {
-    stop("x must be of class 'maly_detect'.")
+  if (!inherits(object, "maly_detect")) {
+    stop("object must be of class 'maly_detect'.")
   }
 
   # Get the method used for detection
-  method <- attr(x, "maly_detect_attr")$method
+  method <- attr(object, "maly_detect_attr")$method
 
   # Get the number of rows and columns in the data frame
-  n_rows <- nrow(x)
-  n_cols <- ncol(x)
+  n_rows <- nrow(object)
+  n_cols <- ncol(object)
 
   # Get the columns used for country, time, and indicator
-  country_cols <- attr(x, "country_columns")
-  time_col <- attr(x, "time_columns")
-  indicator_col <- attr(x, "indicator_columns")
+  country_cols <- attr(object, "country_columns")
+  time_col <- attr(object, "time_columns")
+  indicator_col <- attr(object, "indicator_columns")
 
 
   if (length(method) > 1) {
     # Get the number of countries with outliers
-    n_countries <- length(unique(x[x$outlier_indicator_total > 0, country_cols[1]]))
-    unique_indicators <- unique(x[x$outlier_indicator_total > 0, indicator_col])
+    n_countries <- length(unique(object[object$outlier_indicator_total > 0, country_cols[1]]))
+    unique_indicators <- unique(object[object$outlier_indicator_total > 0, indicator_col])
     n_indicators <- length(unique_indicators[!is.na(unique_indicators)])
-    n_time_periods <- length(unique(x[x$outlier_indicator_total > 0, time_col]))
+    n_time_periods <- length(unique(object[object$outlier_indicator_total > 0, time_col]))
 
     # Get the number of outliers detected
-    n_outliers <- sum(x$outlier_indicator_total, na.rm = TRUE)
+    n_outliers <- sum(object$outlier_indicator_total, na.rm = TRUE)
   } else {
     # Get the number of countries with outliers
-    n_countries <- length(unique(x[x$outlier_indicator == 1, country_cols[1]]))
-    unique_indicators <- unique(x[x$outlier_indicator == 1, indicator_col])
+    n_countries <- length(unique(object[object$outlier_indicator == 1, country_cols[1]]))
+    unique_indicators <- unique(object[object$outlier_indicator == 1, indicator_col])
     n_indicators <- length(unique_indicators[!is.na(unique_indicators)])
-    n_time_periods <- length(unique(x[x$outlier_indicator == 1, time_col]))
+    n_time_periods <- length(unique(object[object$outlier_indicator == 1, time_col]))
 
     # Get the number of outliers detected
-    n_outliers <- sum(x$outlier_indicator, na.rm = TRUE)
+    n_outliers <- sum(object$outlier_indicator, na.rm = TRUE)
   }
 
   # Table of outliers per country
   if (n_countries > 0) {
     if(length(method) > 1) {
-      outlier_table <- table(x[x$outlier_indicator_total > 0, country_cols[1]])
+      outlier_table <- table(object[object$outlier_indicator_total > 0, country_cols[1]])
       # Extract the country with most outliers
       most_outliers_country <- names(which.max(outlier_table))
     } else {
-      outlier_table <- table(x[x$outlier_indicator == 1, country_cols[1]])
+      outlier_table <- table(object[object$outlier_indicator == 1, country_cols[1]])
       # Extract the country with most outliers
       most_outliers_country <- names(which.max(outlier_table))
     }
@@ -542,11 +559,11 @@ summary.maly_detect <- function(x, ...) {
   cat(" Information of outliers: \n")
 
   cat("  Number of countries with outliers:", n_countries, "of a total of" ,
-      length(unique(x[[country_cols[1]]])), "countries\n")
+      length(unique(object[[country_cols[1]]])), "countries\n")
   cat("  Number of indicators with outliers:", n_indicators, "of a total of",
-      length(unique(x[[indicator_col]])), "indicators\n")
+      length(unique(object[[indicator_col]])), "indicators\n")
   cat("  Number of time periods with outliers:", n_time_periods, "of a total of",
-      length(unique(x[[time_col]])), "time periods\n")
+      length(unique(object[[time_col]])), "time periods\n")
   cat("  Number of outliers detected:", n_outliers, "\n")
 
   if (n_countries > 0) {
@@ -568,6 +585,9 @@ summary.maly_detect <- function(x, ...) {
 #' Default is NULL, which means first country in the data will be used.
 #' @param indicator A string specifying the indicator to plot. Only one per graph.
 #' Default is NULL, which means the first indicator in the data will be used.
+#' @param .total_threshold A numeric value specifying the threshold for the total outlier indicator when using
+#' multiple methods. Default is \code{M-1}, where \code{M} is total number of methods; which means that an
+#' outlier will be highlighted if it detected by all methods.
 #' @param x.lab A string specifying the label for the x-axis.
 #' Default is NULL, which means the time column will be used.
 #' @param y.lab A string specifying the label for the y-axis of the original value (top graph).
@@ -584,7 +604,7 @@ summary.maly_detect <- function(x, ...) {
 #'
 #' @export
 #' @method plot maly_detect
-plot.maly_detect <- function(x, country = NULL, indicator = NULL, x.lab = NULL, y.lab = NULL, ...) {
+plot.maly_detect <- function(x, country = NULL, indicator = NULL, .total_threshold = NULL, x.lab = NULL, y.lab = NULL, ...) {
   # Check if country and indicator are specified
   if (is.null(indicator)) {
     indicator <- unique(x[[attr(x, "indicator_columns")[1]]])[1]
@@ -636,10 +656,15 @@ plot.maly_detect <- function(x, country = NULL, indicator = NULL, x.lab = NULL, 
     .data$Imputed <- factor(.data$Imputed, levels = c(TRUE, FALSE), labels = c("Imputed", "Not Imputed"))
   }
 
+  # Check if .total_threshold is specified, if not, set it to M-1
+  if (is.null(.total_threshold)) {
+    .total_threshold <- length(attr(x, "maly_detect_attr")$method) - 1
+  }
+
   # Check if multiple methods were used
   if (length(attr(x, "maly_detect_attr")$method) > 1) {
     .detection_col <- "outlier_indicator_total"
-    .data[[.detection_col]] <- ifelse(.data[[.detection_col]] > 0, "Outlier", "Not Outlier")
+    .data[[.detection_col]] <- ifelse(.data[[.detection_col]] > .total_threshold, "Outlier", "Not Outlier")
     .data[[.detection_col]] <- factor(.data[[.detection_col]], levels = c("Outlier", "Not Outlier"))
 
     # Summarise by country and indicator the time periods with outliers

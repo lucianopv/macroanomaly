@@ -1,3 +1,7 @@
+# global variables
+utils::globalVariables(c("Country.Name", "Country.Code", "Indicator.Code", "Indicator.Name", "Year", "value", "Length"))
+
+
 #' Prepare format using the csv file downloaded from WorldBank
 #'
 #' @param .data The data frame to be prepared obtained directly from the CSV file
@@ -65,6 +69,9 @@ prepare_csv <- function(.data){
 #' a data frame with the data directory (\code{.prepare = FALSE}), or
 #' a list with the data (either tidy or not) and additional data.frame with the
 #' information provided in \code{.additional = TRUE}.
+#'
+#' @importFrom utils download.file unzip read.csv write.csv
+#'
 #' @export
 wdi_download <- function(.path = tempdir(), .prepare = TRUE, .additional = FALSE){
   # Url to download the CSV files

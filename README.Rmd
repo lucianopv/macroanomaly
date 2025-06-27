@@ -16,6 +16,7 @@ knitr::opts_chunk$set(
 # macroanomaly
 
 <!-- badges: start -->
+[![R-CMD-check](https://github.com/lucianopv/macroanomaly/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/lucianopv/macroanomaly/actions/workflows/R-CMD-check.yaml)
 <!-- badges: end -->
 
 The goal of `macroanomaly` is to detect anomalies in macroeconomic data using various statistical methods. This package provides tools for identifying outliers in time series data, particularly focusing on macroeconomic indicators. The package includes methods such as Z-score normalization, isolation forests, outlier trees, and time series outlier detection. 
