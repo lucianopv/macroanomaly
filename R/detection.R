@@ -278,6 +278,7 @@ isotree_detection <- function(.data,
 #'
 #' @param .data A data frame containing the dataset to be analyzed.
 #' @param .cols A character vector specifying the columns to be used for outlier detection. Default is NULL, which uses all columns.
+#' @param .value_col A character string specifying the column name for value identifiers. Default is NULL, which uses the value column defined in the normalize function.
 #' @param .threshold A numeric value specifying the threshold for outlier detection. Default is 0.5.
 #' @param .save_outliers A logical value indicating whether to save the outliers. Default is TRUE.
 #' @param .nthreads A numeric value specifying the number of threads to be used. Default is 2.

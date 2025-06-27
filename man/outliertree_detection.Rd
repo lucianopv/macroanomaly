@@ -19,6 +19,8 @@ outliertree_detection(
 
 \item{.cols}{A character vector specifying the columns to be used for outlier detection. Default is NULL, which uses all columns.}
 
+\item{.value_col}{A character string specifying the column name for value identifiers. Default is NULL, which uses the value column defined in the normalize function.}
+
 \item{.threshold}{A numeric value specifying the threshold for outlier detection. Default is 0.5.}
 
 \item{.save_outliers}{A logical value indicating whether to save the outliers. Default is TRUE.}
