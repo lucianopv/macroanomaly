@@ -1,6 +1,6 @@
 ---
 title: "Macroanomaly: Detecting outliers in time series data"
-output: pdf_document
+output: rmarkdown::html_vignette
 author: 
   - "Luciano Perfetti Villa"
   - "David L. Newhouse"
