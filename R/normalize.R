@@ -42,7 +42,7 @@ convert_to_tsibble <- function(.data,
                                .long_format = TRUE) {
   # Check if the required columns exist in the data
   if (!all(c(.country_col, .time_col) %in% colnames(.data))) {
-    stop("The specified columns do not exist in the data.")
+    stop("The specified columns do not exist in the data.", call. = FALSE)
   }
 
   # Check if only one indicator
@@ -64,7 +64,7 @@ convert_to_tsibble <- function(.data,
       fmutate(across(.time_col, tsibble::yearmonth)) |>
       tsibble::as_tsibble(key = .keys, index = .time_col) -> .data
   } else {
-    stop("Invalid frequency. Choose 'yearly', 'quarterly', or 'monthly'.")
+    stop("Invalid frequency. Choose 'yearly', 'quarterly', or 'monthly'.", call. = FALSE)
   }
 
   return(.data)
@@ -103,12 +103,12 @@ impute_missing <- function(.data,
                            ...) {
   # Check if the required columns exist in the data
   if (!all(c(.country_col, .time_col, .indicator_col) %in% colnames(.data))) {
-    stop("The specified columns do not exist in the data.")
+    stop("The specified columns do not exist in the data.", call. = FALSE)
   }
 
   # Check if the method is valid
   if (!.method %in% c("na_interpolation", "na_kalman", "na_mean", "na_locf", "na_ma", "na_seadec", "na_random")) {
-    stop("Invalid method. Choose 'na_interpolation', 'na_kalman', 'na_mean', 'na_locf', 'na_ma', 'na_seadec', or 'na_random'.")
+    stop("Invalid method. Choose 'na_interpolation', 'na_kalman', 'na_mean', 'na_locf', 'na_ma', 'na_seadec', or 'na_random'.", call. = FALSE)
   }
 
   # Missing minimum values per method
@@ -138,7 +138,7 @@ impute_missing <- function(.data,
 
   if (nrow(.missing_data) > 0) {
     stop(paste("The following countries do not have enough data (i.e.,", .min_obs, " data point) for imputation:\n"),
-            paste(.missing_data[[.country_col[1]]], collapse = ", "), ".\n Consider excluding these countries.")
+            paste(.missing_data[[.country_col[1]]], collapse = ", "), ".\n Consider excluding these countries.", call. = FALSE)
   }
 
   suppressWarnings({
@@ -184,17 +184,17 @@ check_missing_countries <- function(.data,
                               .min_obs = 2) {
   # Check if the required columns exist in the data
   if (!all(c(.country_col, .time_col) %in% colnames(.data))) {
-    stop("The specified columns do not exist in the data.")
+    stop("The specified columns do not exist in the data.", call. = FALSE)
   }
 
   # Check if the value column exists
   if (!.value_col %in% colnames(.data)) {
-    stop("The specified value column does not exist in the data.")
+    stop("The specified value column does not exist in the data.", call. = FALSE)
   }
 
   # Check if the indicator column exists
   if (!.indicator_col %in% colnames(.data)) {
-    stop("The specified indicator column does not exist in the data.")
+    stop("The specified indicator column does not exist in the data.", call. = FALSE)
   }
 
   # Check if enough values for imputation
@@ -239,12 +239,12 @@ decompose_tsibble <- function(.data,
                                .imputed = NULL) {
   # Check if the required columns exist in the data
   if (!all(c(.value_col) %in% colnames(.data))) {
-    stop("The specified columns do not exist in the data.")
+    stop("The specified columns do not exist in the data.", call. = FALSE)
   }
 
   # Check if the frequency is valid
   if (!.frequency %in% c("yearly", "quarterly", "monthly")) {
-    stop("Invalid frequency. Choose 'yearly', 'quarterly', or 'monthly'.")
+    stop("Invalid frequency. Choose 'yearly', 'quarterly', or 'monthly'.", call. = FALSE)
   }
 
   # Construct formula for decomposition
@@ -257,12 +257,12 @@ decompose_tsibble <- function(.data,
   # Check for gaps in the data using the tsibble package
   .gaps <- tsibble::has_gaps(.data)
   if(any(.gaps$.gaps)) {
-    stop("The data contains gaps. Consider filling them before decomposition and using .impute = TRUE")
+    stop("The data contains gaps. Consider filling them before decomposition and using .impute = TRUE", call. = FALSE)
   }
 
   # Check for missing values in the data
   if (any(is.na(.data[[.value_col]]))) {
-    stop("The data contains missing values. Consider filling them before decomposition or using .impute = TRUE with prefered method")
+    stop("The data contains missing values. Consider filling them before decomposition or using .impute = TRUE with prefered method", call. = FALSE)
   }
 
   # Perform decomposition using the STL method
@@ -329,23 +329,23 @@ normalize <- function(.data,
                           ...) {
   # Check if the required columns exist in the data
   if (!all(c(.country_col, .time_col, .indicator_col) %in% colnames(.data))) {
-    stop("The specified columns do not exist in the data.")
+    stop("The specified columns do not exist in the data.", call. = FALSE)
   }
 
   # Check if the value column exists
   if (any(!.value_col %in% colnames(.data))) {
-    stop("The specified value column does not exist in the data.")
+    stop("The specified value column does not exist in the data.", call. = FALSE)
   }
 
   # Check the input of columns, if numbers obtain columns and check if they exist
   if(length(.value_col) > 1) {
-    warning("Multiple columns specified to normalize. Only the first one will be used. Make sure the data is long format.")
+    warning("Multiple columns specified to normalize. Only the first one will be used. Make sure the data is long format.", call. = FALSE)
     .value_col <- .value_col[1]
   }
 
   # Check if the value column is numeric
   if(!is.numeric(.data[[.value_col]])) {
-      warning("The column specified is not numeric. Converting to numeric.")
+      warning("The column specified is not numeric. Converting to numeric.", call. = FALSE)
       .data[[.value_col]] <- as.numeric(.data[[.value_col]])
   }
 
@@ -362,7 +362,7 @@ normalize <- function(.data,
   # Check the tsibble for gaps, if so, correct them
   .gaps <- tsibble::has_gaps(.data)
   if(any(.gaps$.gaps)) {
-    warning("The data contains gaps. Will include missing period and impute them.")
+    warning("The data contains gaps. Will include missing period and impute them.", call. = FALSE)
     .data <- tsibble::fill_gaps(.data)
     .total_gaps <- sum(tsibble::count_gaps(.data, .full = TRUE)$.n)
   } else {
@@ -382,9 +382,9 @@ normalize <- function(.data,
                              .method = .method,
                              ...)
   } else if (.impute & is.null(.method)) {
-    warning("The imputation method is not specified. No imputation will be performed.")
+    warning("The imputation method is not specified. No imputation will be performed.", call. = FALSE)
   } else {
-    warning("No imputation will be performed.")
+    warning("No imputation will be performed.", call. = FALSE)
   }
 
   # Detrend the data using the decompose_tsibble function
@@ -561,12 +561,12 @@ plot.maly_norm <- function(x, country = NULL, indicator = NULL, x.lab = NULL, y.
 
   # Check if the data is empty
   if (nrow(.data) == 0) {
-    stop(paste("No data found for country:", country, "and indicator:", indicator))
+    stop(paste("No data found for country:", country, "and indicator:", indicator), call. = FALSE)
   }
 
   # Check if the time column exists
   if (!attr(x, "time_columns")[1] %in% colnames(.data)) {
-    stop(paste("The time column", attr(x, "time_columns")[1], "does not exist in the data."))
+    stop(paste("The time column", attr(x, "time_columns")[1], "does not exist in the data."), call. = FALSE)
   }
 
   # Check if the frequency is yearly or not
@@ -583,12 +583,12 @@ plot.maly_norm <- function(x, country = NULL, indicator = NULL, x.lab = NULL, y.
 
   # Check if the value column exists
   if (!attr(x, "value_column") %in% colnames(.data)) {
-    stop(paste("The value column", attr(x, "value_column"), "does not exist in the data."))
+    stop(paste("The value column", attr(x, "value_column"), "does not exist in the data."), call. = FALSE)
   }
 
   # Check if the Zscore column exists
   if (!"Zscore" %in% colnames(.data)) {
-    stop("The Zscore column does not exist in the data. Consider running the normalize function first.")
+    stop("The Zscore column does not exist in the data. Consider running the normalize function first.", call. = FALSE)
   }
 
   # Relabel Imputed column if it exists

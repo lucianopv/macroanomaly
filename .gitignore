@@ -9,3 +9,5 @@ data-raw/WDIfootnote.csv
 data-raw/WDIseries-time.csv
 data-raw/WDISeries.csv
 inst/doc
+/doc/
+/Meta/

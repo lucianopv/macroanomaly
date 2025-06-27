@@ -10,6 +10,7 @@ detect(
   .country_col = NULL,
   .time_col = NULL,
   .indicator_col = NULL,
+  .value_col = NULL,
   .additional_cols = FALSE,
   .args = list()
 )
@@ -36,6 +37,9 @@ same as the ones defined for the \code{normalize} function.}
 
 \item{.indicator_col}{A character string specifying the column name for indicator identifiers. Not needed if these
 are the same as the ones defined for the \code{normalize} function.}
+
+\item{.value_col}{A character string specifying the column name for value identifiers. Not needed if these are the
+same as the ones defined for the \code{normalize} function.}
 
 \item{.additional_cols}{A logical value indicating whether to include additional columns in the output data frame.}
 

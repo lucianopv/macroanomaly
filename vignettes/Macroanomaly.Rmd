@@ -1,6 +1,9 @@
 ---
 title: "Macroanomaly: Detecting outliers in time series data"
-output: rmarkdown::html_vignette
+output: pdf_document
+author: 
+  - "Luciano Perfetti Villa"
+  - "David L. Newhouse"
 vignette: >
   %\VignetteIndexEntry{Macroanomaly}
   %\VignetteEngine{knitr::rmarkdown}
@@ -27,22 +30,35 @@ library(collapse)
 This package provides functions to detect outliers in time series data, particularly focusing on macroeconomic indicators. It includes methods for detecting anomalies using various statistical techniques from a range of packages. The package allows the user to detrend, deseasonalize and normalize the data, making it suitable for anomaly detection. 
 
 At the moment the package supports the following methods:
-- Z-score based detection (`zscore`)
-- Isolation Forests (`isotree`)
-- Outlier Trees (`outliertree`) (Warning: this method might not work properly for datasets with more than 1000 rows)
-- Tsoutliers base on the IQR (`tsoutlier`)
-- Point and collective anomalies using the `anomaly` package using the `capa` method (`capa`)
+\begin{itemize}
+  \item Z-score based detection (`zscore`)
+  \item Isolation Forests (`isotree`)
+  \item Outlier Trees (`outliertree`) (Warning: this method might not work properly for datasets with more than 1000 rows)
+  \item Tsoutliers base on the IQR (`tsoutlier`)
+  \item Point and collective anomalies using the `anomaly` package using the `capa` method (`capa`)
+\end{itemize}
+
 
 ## Example Data
 
 To explain each method, we will use two example datasets: an IMF dataset and a World Bank dataset. The IMF dataset contains monthly Consumer Price Index (CPI) data, while the World Bank dataset contains various yearly macroeconomic indicators. For the latter dataset, the package contains a function to load the data and prepare it for analysis.
 
+```{r import-data}
+#| echo: false
+#| warning: false
+#| message: false
+imf_data_long <- read.csv(system.file("extdata", "imf_data.csv", package = "macroanomaly"),header =TRUE)
+wdi_data_long_subset <- read.csv(system.file("extdata", "wdi_data_long_subset.csv", package = "macroanomaly"),header =TRUE)
+```
+
+
 ```{r example_data}
+#| eval: false
 # Load IMF data
-imf_data <- imf.data::load_datasets("CPI")$get_series(freq = "M",
-                                                         indicator = "PCPI_IX",
-                                                         start_period = "2015-01-01",
-                                                         end_period = "2023-12-31") |>
+imf.data::load_datasets("CPI")$get_series(freq = "M",
+                                          indicator = "PCPI_IX",
+                                          start_period = "2015-01-01",
+                                          end_period = "2023-12-31") |>
   fmutate(TIME_PERIOD = lubridate::ym(TIME_PERIOD)) |>
   pivot(
     ids = "TIME_PERIOD",
@@ -61,7 +77,9 @@ wdi_download(.path = tempdir()) |>
     how = "longer",
     names = list("Indicator.Code", "Indicator.Value")
     ) |>
-  fsubset(Indicator.Code %in% c("EG.CFT.ACCS.ZS", "NY.GDP.MKTP.CN.AD") & Year > 2005) -> wdi_data_long_subset
+  fsubset(Indicator.Code %in% c("EG.CFT.ACCS.ZS", 
+                                "NY.GDP.MKTP.CN.AD") & 
+            Year > 2005) -> wdi_data_long_subset
 ```
 
 Many of these time series contain missing values or missing periods, which can usually affect the detection of anomalies. The package provides a functionality that detects missing periods and automatically impute missing data based on a selected method from the `imputeTS` package. If the user prefers to impute the data using a different method, they can do so before applying the anomaly detection methods. However, as with most cases of missing data, if there is no data points for a country and indicator, the current implementation cannot impute data. Therefore, if the user will not impute these data, it is better to exclude them from the analysis. The `normalize` function will let the user known that there are countries with missing values, and that these should be excluded. 
@@ -72,11 +90,17 @@ wdi_data_long_subset |>
   fsubset(!Country.Code %in% c("ABW", "ASM", "BGR", "BMU", "CHI", "CUW", "CYM",
                                "FRO", "GIB", "GRL", "GUM", "HKG", "IMN", "INX",
                                "LBN", "LBY", "LIE", "MAC", "MAF", "MNP", "NCL",
-                               "PRI", "PSE", "PYF", "SXM", "TCA", "VGB", "VIR", "XKX", # No data in these countries
-                                 "AFE", "AFW", "ARB", "CEB", "CSS", "EAP", "EAR", "EAS", "ECA", "ECS", "EMU", "EUU",
-                                 "FCS", "HIC", "HPC", "IBD", "IBT", "IDA", "IDB", "IDX", "LAC", "LCN", "LDC", "LIC",
-                                 "LMC", "LMY", "LTE", "MEA", "MIC", "MNA", "NAC", "OED", "OSS", "PRE", "PRK", "PSS",
-                                 "PST", "SAS", "SSA", "SSF", "SST", "TEA", "TEC", "TLA", "TMN", "TSA", "TSS", "UMC", "WLD" # Aggregates without data
+                               "PRI", "PSE", "PYF", "SXM", "TCA", "VGB", "VIR", 
+                               "XKX", 
+                               # No data in these countries or aggregates 
+                               "AFE", "AFW", "ARB", "CEB", "CSS", "EAP", "EAR", 
+                               "EAS", "ECA", "ECS", "EMU", "EUU", "FCS", "HIC", 
+                               "HPC", "IBD", "IBT", "IDA", "IDB", "IDX", "LAC", 
+                               "LCN", "LDC", "LIC", "LMC", "LMY", "LTE", "MEA", 
+                               "MIC", "MNA", "NAC", "OED", "OSS", "PRE", "PRK", 
+                               "PSS", "PST", "SAS", "SSA", "SSF", "SST", "TEA", 
+                               "TEC", "TLA", "TMN", "TSA", "TSS", "UMC", "WLD" 
+                               
                                )) -> wdi_data_long_subset_filtered
 
 imf_data_long |>
@@ -153,7 +177,9 @@ imf_data_long_normalized |>
 
 # Detect anomalies in the IMF data using multiple methods
 imf_data_long_normalized |>
-  detect(.method = c("zscore", "isotree", "capa"), .args = list(zscore = c(.min_seg_len = 3))) -> imf_data_long_multiple_methods
+  detect(.method = c("zscore", "isotree", "capa"), 
+         .args = list(zscore = c(.min_seg_len = 3))
+         ) -> imf_data_long_multiple_methods
 ```
 
 Similar to the `summary` method with the normalized data, we can get a summary of the detected anomalies. This will show some information about the dataset. Let see some information from the IMF data.
@@ -162,6 +188,25 @@ Similar to the `summary` method with the normalized data, we can get a summary o
 # Summary of the detected anomalies in the IMF data
 summary(imf_data_long_multiple_methods)
 ```
+
+Before continuing, we mentioned above that `outliertree` method might not work properly for datasets with more than 1000 rows. Therefore, we will use the `outliertree` method only for a subset of the IMF data, i.e., for Argentina and Zimbabwe. This subset contains 216 observations, since the GitHub [issue](https://github.com/david-cortes/outliertree/issues/6) mentions the problems with 2,000 observations. The `outliertree` method will return a data frame with the results for each country and indicator, and the user can then use the results to analyze the anomalies in the data. At the moment, the `detect` function using the `outliertree` method will ignore the column that contains the original value (i.e., `value` column), and will only return detect using the `Zscore`. The user can then use the `plot` method to visualize the results.
+
+```{r}
+# Detect anomalies in the IMF data using outliertree
+imf_data_long |> 
+  collapse::fsubset(Country %in% c("AR", "ZW")) |> 
+  normalize(.indicator_col = "variable",
+            .frequency = "monthly",
+            .value_col = "value",
+            .country_col = "Country",
+            .detrend = TRUE,
+            .impute = TRUE,
+            .time_col = "TIME_PERIOD") |>
+    detect(.method = "outliertree", 
+           .args = list(outliertree = list(.cols = c("Zscore", "Country", "TIME_PERIOD")))
+           ) -> imf_data_long_outliertree
+```
+
 
 We can also plot the detected anomalies using the `plot` method. The `plot` method will plot the original and normalized data, and highlight the detected anomalies. As before, the imputed values will be red, but the outliers will have a bright color (i.e, red or black). The user can specify the country and indicator to plot by using the `country` and `indicator` arguments, as well as the x-axis and y-axis labels.
 
@@ -182,7 +227,10 @@ wdi_data_long_subset_normalized |>
 
 # Detect anomalies in the World Bank data using multiple methods
 wdi_data_long_subset_normalized |>
-  detect(.method = c("tsoutlier", "isotree", "capa"), .args = list(capa = c(.min_seg_len = 3), isotree = c(.threshold = 0.7))) -> wdi_data_long_multiple_methods
+  detect(.method = c("tsoutlier", "isotree", "capa"), 
+         .args = list(capa = c(.min_seg_len = 3), 
+                      isotree = c(.threshold = 0.7))
+         ) -> wdi_data_long_multiple_methods
 ```
 
 We can get a summary of the detected anomalies in the World Bank data, which will show some information about the dataset.
@@ -198,8 +246,11 @@ We can also plot the detected anomalies in the World Bank data, similar to the I
 #| fig.width: 8
 #| fig.height: 8
 # Plot the detected anomalies in the World Bank data
-plot(wdi_data_long_multiple_methods, country = "BGD", indicator = "EG.CFT.ACCS.ZS",
-     x.lab = "Time", y.lab = "Access to clean fuels for cooking (% of pop.)")
+plot(wdi_data_long_multiple_methods, 
+     country = "BGD", 
+     indicator = "EG.CFT.ACCS.ZS",
+     x.lab = "Time", 
+     y.lab = "Access to clean fuels for cooking (% of pop.)")
 ```
 
 Finally, we can save the results to a CSV file using `write_to_csv` function. The use have the option to save the results by rank and limiting the number of outliers to preserve; or all the results if needed. The user can specify the file name and path, and have the option to save additional columns from the different methods or only the main columns. 
@@ -207,7 +258,9 @@ Finally, we can save the results to a CSV file using `write_to_csv` function. Th
 ```{r save-results}
 #| eval: false
 # Save the results to a CSV file only the first 30 outliers
-write_to_csv(imf_data_long_multiple_methods, file = "imf_data_anomalies.csv", top_outliers = 30,
+write_to_csv(imf_data_long_multiple_methods, 
+             file = "imf_data_anomalies.csv", 
+             top_outliers = 30,
              additional_cols = FALSE)
 
 # Save the results to a CSV file with all outliers

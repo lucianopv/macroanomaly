@@ -7,6 +7,7 @@
 outliertree_detection(
   .data,
   .cols = NULL,
+  .value_col = NULL,
   .threshold = 0.5,
   .save_outliers = TRUE,
   .nthreads = 2,
