@@ -4,6 +4,7 @@ output: rmarkdown::html_vignette
 author: 
   - "Luciano Perfetti Villa"
   - "David L. Newhouse"
+  - "Olivier Dupriez"
 vignette: >
   %\VignetteIndexEntry{Macroanomaly}
   %\VignetteEngine{knitr::rmarkdown}
