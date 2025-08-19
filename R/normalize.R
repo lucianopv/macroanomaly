@@ -349,6 +349,7 @@ normalize <- function(.data,
       .data[[.value_col]] <- as.numeric(.data[[.value_col]])
   }
 
+  .data <- as.data.frame(.data)
   # Check if data is tsibble, if not convert to tsibble
   if (!class(.data) %in% c("tbl_ts", "tbl_df")) {
     .data <- convert_to_tsibble(.data,
