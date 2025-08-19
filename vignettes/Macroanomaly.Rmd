@@ -1,9 +1,10 @@
 ---
 title: "Macroanomaly: Detecting outliers in time series data"
 output: rmarkdown::html_vignette
+#output: pdf_document
 author: 
   - "Luciano Perfetti Villa"
-  - "David L. Newhouse"
+  - "David Newhouse"
   - "Olivier Dupriez"
 vignette: >
   %\VignetteIndexEntry{Macroanomaly}
@@ -28,18 +29,19 @@ library(collapse)
 
 ## Introduction
 
-This package provides functions to detect outliers in time series data, particularly focusing on macroeconomic indicators. It includes methods for detecting anomalies using various statistical techniques from a range of packages. The package allows the user to detrend, deseasonalize and normalize the data, making it suitable for anomaly detection. 
+This package provides functions to detect outliers in time series data, particularly focusing on macroeconomic indicators. It includes methods for detecting anomalies using various statistical techniques from a range of packages. The package allows the user to detrend, deseasonalize and normalize the data, making it suitable for anomaly detection.
 
 At the moment the package supports the following methods:
+
+```{=tex}
 \begin{itemize}
-  \item Z-score based detection (`zscore`)
-  \item Isolation Forests (`isotree`)
-  \item Outlier Trees (`outliertree`) (Warning: this method might not work properly for datasets with more than 1000 rows)
-  \item Tsoutliers base on the IQR (`tsoutlier`)
-  \item Point and collective anomalies using the `anomaly` package using the `capa` method (`capa`)
+  \item Z-score based detection ("zscore")
+  \item Isolation Forests using the \texttt{isotree} package ("isotree")
+  \item Outlier Trees using the \texttt{outliertree} package ("outliertree") (Warning: this method might not work properly for datasets with more than 1000 rows)
+  \item Tsoutliers based on the IQR, as implemented in the \texttt{forecast} package ("tsoutlier")
+  \item Point and collective anomalies using the \texttt{capa} method in the \texttt{anomaly} package ("capa")
 \end{itemize}
-
-
+```
 ## Example Data
 
 To explain each method, we will use two example datasets: an IMF dataset and a World Bank dataset. The IMF dataset contains monthly Consumer Price Index (CPI) data, while the World Bank dataset contains various yearly macroeconomic indicators. For the latter dataset, the package contains a function to load the data and prepare it for analysis.
@@ -51,7 +53,6 @@ To explain each method, we will use two example datasets: an IMF dataset and a W
 imf_data_long <- read.csv(system.file("extdata", "imf_data.csv", package = "macroanomaly"),header =TRUE)
 wdi_data_long_subset <- read.csv(system.file("extdata", "wdi_data_long_subset.csv", package = "macroanomaly"),header =TRUE)
 ```
-
 
 ```{r example_data}
 #| eval: false
@@ -83,26 +84,13 @@ wdi_download(.path = tempdir()) |>
             Year > 2005) -> wdi_data_long_subset
 ```
 
-Many of these time series contain missing values or missing periods, which can usually affect the detection of anomalies. The package provides a functionality that detects missing periods and automatically impute missing data based on a selected method from the `imputeTS` package. If the user prefers to impute the data using a different method, they can do so before applying the anomaly detection methods. However, as with most cases of missing data, if there is no data points for a country and indicator, the current implementation cannot impute data. Therefore, if the user will not impute these data, it is better to exclude them from the analysis. The `normalize` function will let the user known that there are countries with missing values, and that these should be excluded. 
+Many of these time series contain missing values or missing periods, which can usually affect the detection of anomalies. The package provides a functionality that detects missing periods and automatically imputes missing data based on a selected method from the `imputeTS` package. If the user prefers to impute the data using a different method, they can do so before applying the anomaly detection methods. However, as with most cases of missing data, if there is no data points for a country and indicator, the current implementation cannot impute data. Therefore, if the user will not impute these data, it is better to exclude them from the analysis. The `normalize` function will let the user know that there are countries with missing values, and that these should be excluded.
 
 ```{r filtering-data}
 # Filter the data to remove countries with no data points
-wdi_data_long_subset |>
-  fsubset(!Country.Code %in% c("ABW", "ASM", "BGR", "BMU", "CHI", "CUW", "CYM",
-                               "FRO", "GIB", "GRL", "GUM", "HKG", "IMN", "INX",
-                               "LBN", "LBY", "LIE", "MAC", "MAF", "MNP", "NCL",
-                               "PRI", "PSE", "PYF", "SXM", "TCA", "VGB", "VIR", 
-                               "XKX", 
-                               # No data in these countries or aggregates 
-                               "AFE", "AFW", "ARB", "CEB", "CSS", "EAP", "EAR", 
-                               "EAS", "ECA", "ECS", "EMU", "EUU", "FCS", "HIC", 
-                               "HPC", "IBD", "IBT", "IDA", "IDB", "IDX", "LAC", 
-                               "LCN", "LDC", "LIC", "LMC", "LMY", "LTE", "MEA", 
-                               "MIC", "MNA", "NAC", "OED", "OSS", "PRE", "PRK", 
-                               "PSS", "PST", "SAS", "SSA", "SSF", "SST", "TEA", 
-                               "TEC", "TLA", "TMN", "TSA", "TSS", "UMC", "WLD" 
-                               
-                               )) -> wdi_data_long_subset_filtered
+nobs <- fnobs(wdi_data_long_subset$Indicator.Value,
+              g=wdi_data_long_subset[c("Country.Code","Indicator.Code")],TRA=2)
+wdi_data_long_subset |> fsubset(!is.na(nobs)) -> wdi_data_long_subset_filtered
 
 imf_data_long |>
   fsubset(!Country %in% c("YE")) -> imf_data_long_filtered
@@ -135,23 +123,23 @@ wdi_data_long_subset_filtered |>
             ) -> wdi_data_long_subset_normalized
 ```
 
-We can get summary of the normalized data, which will show the number of countries and indicators, as well as the number of gaps and missing values. This is useful to understand the data before applying the anomaly detection methods.
+We can get a summary of the normalized data, which will show the number of countries and indicators, as well as the number of gaps and missing values. This is useful to understand the data before applying the anomaly detection methods.
 
 ```{r summary-normalized-data}
 # Summary of the normalized IMF data
 summary(imf_data_long_normalized)
 ```
 
-We can also plot the original and normalized data to see the effect of normalization. The `plot_normalized` function will plot the original and normalized data for each country and indicator. The highlighted points in red are the imputed values. It is important to account for this, since some future outliers may be imputed values, and therefore not real anomalies. By default, the `plot` method will plot the first country and indicator in the data. The user can specify the country and indicator to plot by using the `country` and `indicator` arguments. Also, the use can change the x-axis and y-axis labels. 
+We can also plot the original and normalized data to see the effect of normalization. The `plot_normalized` function will plot the original and normalized data for each country and indicator. The highlighted points in red are the imputed values. It is important to account for this, since some future outliers may be imputed values, and therefore not real anomalies. By default, the `plot` method will plot the first country and indicator in the data. The user can specify the country and indicator to plot by using the `country` and `indicator` arguments. Also, the use can change the x-axis and y-axis labels.
 
 ```{r plot-normalized-data}
 #| fig.width: 8
 #| fig.height: 8
 # Plot the normalized IMF data
 plot(imf_data_long_normalized)
-``` 
+```
 
-Let's take for instance Sudan. We can see that the CPI for the months after 2023 are not recorded, and therefore the values are imputed. 
+Let's look at Sudan. We can see that the CPI for the months after 2023 are not recorded, and therefore the values are imputed.
 
 ```{r plot-normalized-data-sudan}
 #| fig.width: 8
@@ -208,7 +196,6 @@ imf_data_long |>
            ) -> imf_data_long_outliertree
 ```
 
-
 We can also plot the detected anomalies using the `plot` method. The `plot` method will plot the original and normalized data, and highlight the detected anomalies. As before, the imputed values will be red, but the outliers will have a bright color (i.e, red or black). The user can specify the country and indicator to plot by using the `country` and `indicator` arguments, as well as the x-axis and y-axis labels.
 
 ```{r plot-detected-anomalies-imf}
@@ -254,7 +241,7 @@ plot(wdi_data_long_multiple_methods,
      y.lab = "Access to clean fuels for cooking (% of pop.)")
 ```
 
-Finally, we can save the results to a CSV file using `write_to_csv` function. The use have the option to save the results by rank and limiting the number of outliers to preserve; or all the results if needed. The user can specify the file name and path, and have the option to save additional columns from the different methods or only the main columns. 
+Finally, we can save the results to a CSV file using `write_to_csv` function. The user has the option to save the results by rank and limiting the number of outliers to preserve; or all the results if needed. The user can specify the file name and path, and have the option to save additional columns from the different methods or only the main columns.
 
 ```{r save-results}
 #| eval: false
@@ -266,12 +253,14 @@ write_to_csv(imf_data_long_multiple_methods,
 
 # Save the results to a CSV file with all outliers
 write_to_csv(wdi_data_long_multiple_methods, file = "wdi_data_anomalies.csv")
-``` 
+```
 
 ## Conclusion
+
 The `macroanomaly` package provides a set of functions to detect anomalies in time series data, particularly focusing on macroeconomic indicators. The package allows the user to normalize, detrend, and deseasonalize the data, making it suitable for anomaly detection. The user can choose from several methods to detect anomalies, including Z-score based detection, Isolation Forests, Outlier Trees, IQR based outliers, and Point and Collective Anomalies using the `anomaly` package. The package also provides functions to plot the results and summarize the detected anomalies.
 
 ## Session Info
+
 ```{r session-info}
 sessionInfo()
-``` 
+```

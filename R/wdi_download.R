@@ -95,7 +95,7 @@ wdi_download <- function(.path = tempdir(), .prepare = TRUE, .additional = FALSE
     unzip(file.path(.path, .wdi_zip), exdir = .path)
     ## unlink(file.path(.path, .wdi_zip))
   } else {
-    print("File already exists. No need to download.")
+    print(paste0("File already exists in ",.path_csv,". No new download."))
   }
 
   .data <- read.csv(.path_csv, stringsAsFactors = FALSE)
