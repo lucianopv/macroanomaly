@@ -431,6 +431,109 @@ tsoutliers_detection <- function(.data, .threshold = 3) {
   return(.data)
 }
 
+#' Function to return point anomalies
+#' 
+#' @param object An instance of an S4 class produced by \code{\link{capa}}.
+#' @param epoch Positive integer. CAPA methods are sequential and as such, can generate results up to, and including, any epoch within the data series. This can be controlled by the value
+#' of \code{epoch} and is useful for examining how the inferred anomalies are modified as the data series grows. The default value for \code{epoch} is the length of the data series.
+#' 
+#' @return A data frame. 
+#' 
+#' @importFrom anomaly anomalies tukey_mean 
+#' @export
+point_anomalies <- function(object,epoch=NULL) {
+        if (is.null(epoch)) {
+          epoch <- nrow(object@data)
+        }    
+        if(epoch < 0)
+            {
+              stop("epoch should be a positive integer")
+            }
+            if(epoch > nrow(object@data))
+            {
+              stop("epoch cannot be greater than the number of observations in the data")
+            }
+            # get the anomalies
+            anoms<-anomaly:::anomalies(object,epoch)
+            # transform data
+            data_dash<-object@data
+            p_anoms<-Map(function(x) x[1],Filter(function(x) x[1] == x[2],anoms))
+            p_anom_daf <- NULL 
+            if(length(p_anoms) > 0)
+            {
+              p_anom_daf <- Reduce(rbind,
+                                   Map(
+                                     function(p_anom)
+                                     {
+                                       variates<-seq(1,ncol(data_dash))[as.logical(object@components[p_anom[1],])]
+                                       location<-rep(p_anom[1],length(variates))
+                                       strength<-abs(data_dash[p_anom[1],variates])
+                                       return(
+                                         data.frame("location"=location,
+                                                    "variate"=variates,
+                                                    "strength"=strength)
+                                       )
+                                     },
+                                     p_anoms)
+              )
+            }
+            
+            extra_anoms <- data.frame("location"=integer(0),"variate"=integer(0),"strength"=integer(0))
+            
+            if (object@type == "robustmean"){
+              
+              tmp <- collective_anomalies(as(object,"capa.class"))
+              
+              if (nrow(tmp)>0)
+              {
+                
+                extra_anoms <- Reduce(rbind,
+                                      Map(
+                                        function(ii)
+                                        {
+                                          relevant_row = tmp[ii,]
+                                          if (is.null(relevant_row$start.lag)){
+                                            effective_start = relevant_row$start
+                                            effective_end   = relevant_row$end
+                                          } else{
+                                            effective_start = relevant_row$start+relevant_row$start.lag
+                                            effective_end   = relevant_row$end-relevant_row$start.lag                                      
+                                          }
+                                          x_data = data_dash[effective_start:effective_end,relevant_row$variate]
+                                          standardised_x_data = x_data - anomaly:::tukey_mean(x_data,sqrt(object@beta_tilde))
+                                          
+                                          location<-which(abs(standardised_x_data)>sqrt(object@beta_tilde))
+                                          strength<-abs(standardised_x_data[location])
+                                          variates<-rep(relevant_row$variate,length(location))
+                                          if (length(location > 0)){
+                                            location = location - 1 + effective_start
+                                          }
+                                          return(
+                                            data.frame("location"=location,
+                                                       "variate"=variates,
+                                                       "strength"=strength)
+                                          )
+                                        },
+                                        1:nrow(tmp))
+                )
+                
+              }
+              
+            }
+            
+            if(length(p_anoms) + nrow(extra_anoms) == 0)
+            {
+              return(data.frame("location"=integer(0),"variate"=integer(0),"strength"=integer(0)))
+            }
+            else
+            {
+              out <- rbind(p_anom_daf,extra_anoms)
+              return(out[order(out$location,out$variate),])
+            }
+          }
+
+
+
 
 #' Function to detect point anomalies in a dataset using capa of the anomaly package
 #'
@@ -446,11 +549,12 @@ tsoutliers_detection <- function(.data, .threshold = 3) {
 #' @param .indicator_col A character string specifying the column name for indicator identifiers.
 #'
 #' @return A data frame containing the original dataset with an additional column indicating the point anomaly status.
-#' @importFrom anomaly capa collective_anomalies point_anomalies
+#' 
 #' @importFrom collapse fmutate fungroup fselect fgroup_by BY GRP fcumsum frename join GRPnames unlist2d
+#' @importFrom anomaly capa collective_anomalies
 #' @importFrom stringr str_split_fixed
-#'
 #' @export
+
 capa_detection <- function(.data,
                            .type = "robustmean",
                            .min_seg_len = 2,
@@ -487,13 +591,14 @@ capa_detection <- function(.data,
     fselect(.country_col, .time_col, .indicator_col, "Zscore") |>
     fgroup_by(c(.country_col, .indicator_col)) |>
     GRP()
-
+  
   # Apply the capa method to detect point anomalies
   outliers <- unlist(BY(x = as.matrix(.data_sub[,"Zscore"]), g = .grouped_data, FUN = anomaly::capa, type = .type, min_seg_len = .min_seg_len, return = 4)[[1]])
 
   # Extract point anomalies using tryCatch to handle potential errors, if error, save as warning
   point_anomalies <- lapply(outliers, \(x)
-                            tryCatch(anomaly::point_anomalies(x),
+                            #tryCatch(anomaly::point_anomalies(x),
+                            tryCatch(point_anomalies(x),
                                    error = function(e) {
                                      warning("Error in detecting point anomalies: ", e$message, call. = FALSE)
                                      return(data.frame(location = NA, variate = NA, strength = NA))
