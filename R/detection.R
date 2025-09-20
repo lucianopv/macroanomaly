@@ -432,19 +432,18 @@ tsoutliers_detection <- function(.data, .threshold = 3) {
 }
 
 #' Function to return point anomalies
-#' 
+#'
 #' @param object An instance of an S4 class produced by \code{\link{capa}}.
 #' @param epoch Positive integer. CAPA methods are sequential and as such, can generate results up to, and including, any epoch within the data series. This can be controlled by the value
 #' of \code{epoch} and is useful for examining how the inferred anomalies are modified as the data series grows. The default value for \code{epoch} is the length of the data series.
-#' 
-#' @return A data frame. 
-#' 
-#' @importFrom anomaly anomalies tukey_mean 
+#'
+#' @return A data frame.
+#'
 #' @export
 point_anomalies <- function(object,epoch=NULL) {
         if (is.null(epoch)) {
           epoch <- nrow(object@data)
-        }    
+        }
         if(epoch < 0)
             {
               stop("epoch should be a positive integer")
@@ -458,7 +457,7 @@ point_anomalies <- function(object,epoch=NULL) {
             # transform data
             data_dash<-object@data
             p_anoms<-Map(function(x) x[1],Filter(function(x) x[1] == x[2],anoms))
-            p_anom_daf <- NULL 
+            p_anom_daf <- NULL
             if(length(p_anoms) > 0)
             {
               p_anom_daf <- Reduce(rbind,
@@ -477,16 +476,16 @@ point_anomalies <- function(object,epoch=NULL) {
                                      p_anoms)
               )
             }
-            
+
             extra_anoms <- data.frame("location"=integer(0),"variate"=integer(0),"strength"=integer(0))
-            
+
             if (object@type == "robustmean"){
-              
+
               tmp <- collective_anomalies(as(object,"capa.class"))
-              
+
               if (nrow(tmp)>0)
               {
-                
+
                 extra_anoms <- Reduce(rbind,
                                       Map(
                                         function(ii)
@@ -497,11 +496,11 @@ point_anomalies <- function(object,epoch=NULL) {
                                             effective_end   = relevant_row$end
                                           } else{
                                             effective_start = relevant_row$start+relevant_row$start.lag
-                                            effective_end   = relevant_row$end-relevant_row$start.lag                                      
+                                            effective_end   = relevant_row$end-relevant_row$start.lag
                                           }
                                           x_data = data_dash[effective_start:effective_end,relevant_row$variate]
                                           standardised_x_data = x_data - anomaly:::tukey_mean(x_data,sqrt(object@beta_tilde))
-                                          
+
                                           location<-which(abs(standardised_x_data)>sqrt(object@beta_tilde))
                                           strength<-abs(standardised_x_data[location])
                                           variates<-rep(relevant_row$variate,length(location))
@@ -516,11 +515,11 @@ point_anomalies <- function(object,epoch=NULL) {
                                         },
                                         1:nrow(tmp))
                 )
-                
+
               }
-              
+
             }
-            
+
             if(length(p_anoms) + nrow(extra_anoms) == 0)
             {
               return(data.frame("location"=integer(0),"variate"=integer(0),"strength"=integer(0)))
@@ -549,7 +548,7 @@ point_anomalies <- function(object,epoch=NULL) {
 #' @param .indicator_col A character string specifying the column name for indicator identifiers.
 #'
 #' @return A data frame containing the original dataset with an additional column indicating the point anomaly status.
-#' 
+#'
 #' @importFrom collapse fmutate fungroup fselect fgroup_by BY GRP fcumsum frename join GRPnames unlist2d
 #' @importFrom anomaly capa collective_anomalies
 #' @importFrom stringr str_split_fixed
@@ -591,7 +590,7 @@ capa_detection <- function(.data,
     fselect(.country_col, .time_col, .indicator_col, "Zscore") |>
     fgroup_by(c(.country_col, .indicator_col)) |>
     GRP()
-  
+
   # Apply the capa method to detect point anomalies
   outliers <- unlist(BY(x = as.matrix(.data_sub[,"Zscore"]), g = .grouped_data, FUN = anomaly::capa, type = .type, min_seg_len = .min_seg_len, return = 4)[[1]])
 
@@ -772,7 +771,7 @@ summary.maly_detect <- function(object, ...) {
 #' @importFrom ggplot2 ggplot aes guides geom_line geom_point labs theme element_text facet_wrap scale_color_manual scale_shape_manual geom_ribbon scale_fill_manual geom_vline scale_alpha_manual
 #' @importFrom rlang sym
 #' @importFrom collapse fsubset fgroup_by fmutate fselect ftransformv
-#' @importFrom patchwork plot_layout
+#' @importFrom patchwork plot_layout plot_annotation
 #' @importFrom lubridate NA_Date_
 #'
 #' @export
@@ -824,9 +823,10 @@ plot.maly_detect <- function(x, country = NULL, indicator = NULL, .total_thresho
     stop("The Zscore column does not exist in the data. Consider running the normalize function first.", call. = FALSE)
   }
 
-  # Relabel Imputed column if it exists
+  # Relabel Imputed column if it exists and obtain the total number of imputed values
   if ("Imputed" %in% colnames(.data)) {
     .data$Imputed <- factor(.data$Imputed, levels = c(TRUE, FALSE), labels = c("Imputed", "Not Imputed"))
+    n_imputed <- sum(.data$Imputed == "Imputed", na.rm = TRUE)
   }
 
   # Check if .total_threshold is specified, if not, set it to M-1
@@ -845,6 +845,11 @@ plot.maly_detect <- function(x, country = NULL, indicator = NULL, .total_thresho
       fgroup_by(c(attr(x, "country_columns")[1], attr(x, "indicator_columns")[1])) |>
       fungroup()
 
+    # If no outliers, warn the user
+    if (nrow(.data_grouped) == 0) {
+      warning(paste("No outliers detected for country:", country, "and indicator:", indicator), call. = FALSE)
+    }
+
   } else {
     .detection_col <- "outlier_indicator"
     .data[[.detection_col]] <- ifelse(.data[[.detection_col]] > 0, "Outlier", "Not Outlier")
@@ -853,6 +858,11 @@ plot.maly_detect <- function(x, country = NULL, indicator = NULL, .total_thresho
     .data_grouped <- .data[.data[[.detection_col]] == "Outlier",] |>
       fgroup_by(c(attr(x, "country_columns")[1], attr(x, "indicator_columns")[1])) |>
       fungroup()
+
+    # If no outliers, warn the user
+    if (nrow(.data_grouped) == 0) {
+      warning(paste("No outliers detected for country:", country, "and indicator:", indicator), call. = FALSE)
+    }
 
   }
 
@@ -866,66 +876,147 @@ plot.maly_detect <- function(x, country = NULL, indicator = NULL, .total_thresho
   }
 
   # Create the plot based on imputation status
-  if (!"Imputed" %in% colnames(.data)) {
-    ggplot(.data, aes(x = .data[[attr(x, "time_columns")[1]]], y = .data[[attr(x, "value_column")]])) +
-      geom_line(alpha = 0.3) +
-      geom_point(aes(alpha = .data[[.detection_col]])) +
-      # geom_vline(data = .data_grouped, aes(xintercept = .data[[attr(x, "time_columns")[1]]]), color = "blue", linetype = "dashed") +
-      scale_alpha_manual(values = c("Outlier" = 1, "Not Outlier" = 0.2)) +
-      facet_wrap(~ .data[[attr(x, "country_columns")[1]]], scales = "free_y") +
-      guides(alpha = "none") +
-      labs(title = paste("Original Series for country", country, " and series", indicator),
-           alpha = "Outlier Indicator",
-           x = x.lab,
-           y = y.lab) -> original_plot
+  if (n_imputed == 0) {
+    if (nrow(.data_grouped) != 0){
+      ggplot(.data, aes(x = .data[[attr(x, "time_columns")[1]]], y = .data[[attr(x, "value_column")]])) +
+        geom_line(alpha = 0.3) +
+        geom_point(aes(alpha = .data[[.detection_col]])) +
+        # geom_vline(data = .data_grouped, aes(xintercept = .data[[attr(x, "time_columns")[1]]]), color = "blue", linetype = "dashed") +
+        scale_alpha_manual(values = c("Outlier" = 1, "Not Outlier" = 0.2)) +
+        facet_wrap(~ .data[[attr(x, "country_columns")[1]]], scales = "free_y") +
+        guides(alpha = "none") +
+        labs(title = paste("Original Series for country", country, " and series", indicator),
+             alpha = "Outlier Indicator",
+             x = x.lab,
+             y = y.lab) -> original_plot
 
-    ggplot(.data, aes(x = .data[[attr(x, "time_columns")[1]]], y = Zscore)) +
-      geom_point(aes(alpha = .data[[.detection_col]])) +
-      # geom_vline(data = .data_grouped, aes(xintercept = .data[[attr(x, "time_columns")[1]]]), color = "blue", linetype = "dashed") +
-      scale_alpha_manual(values = c("Outlier" = 1, "Not Outlier" = 0.2)) +
-      facet_wrap(~ .data[[attr(x, "country_columns")[1]]], scales = "free_y") +
-      theme(axis.text = element_text(size = 8), legend.position = "bottom") +
-      labs(title = paste("Zscore for country", country, " and series", indicator),
-           alpha = "Outlier Indicator",
-           x = x.lab,
-           y = "Zscore") -> zscore_plot
-  } else{
-    ggplot(.data, aes(x = .data[[attr(x, "time_columns")[1]]], y = .data[[attr(x, "value_column")]])) +
-      geom_line(alpha = 0.3) +
-      geom_point(aes(color = Imputed, alpha = .data[[.detection_col]]), show.legend=TRUE) +
-      # geom_vline(data = .data_grouped, aes(xintercept = .data[[attr(x, "time_columns")[1]]]), color = "blue", linetype = "dashed") +
-      scale_color_manual(values = c("Imputed" = "red", "Not Imputed" = "black"), drop = FALSE) +
-      # scale_shape_manual(values = c("Imputed" = 1, "Not Imputed" = 16)) +
-      scale_alpha_manual(values = c("Outlier" = 1, "Not Outlier" = 0.2)) +
-      facet_wrap(~ .data[[attr(x, "country_columns")[1]]], scales = "free_y") +
-      guides(alpha = "none") +
-      theme(axis.text = element_text(size = 8), legend.position = "bottom") +
-      labs(title = paste("Original Series for country", country, " and series", indicator),
-           alpha = "Outlier Indicator",
-           color = "Imputation Status",
-           x = x.lab,
-           y = y.lab) -> original_plot
+      ggplot(.data, aes(x = .data[[attr(x, "time_columns")[1]]], y = Zscore)) +
+        geom_point(aes(alpha = .data[[.detection_col]])) +
+        # geom_vline(data = .data_grouped, aes(xintercept = .data[[attr(x, "time_columns")[1]]]), color = "blue", linetype = "dashed") +
+        scale_alpha_manual(values = c("Outlier" = 1, "Not Outlier" = 0.2)) +
+        facet_wrap(~ .data[[attr(x, "country_columns")[1]]], scales = "free_y") +
+        theme(axis.text = element_text(size = 8), legend.position = "bottom") +
+        labs(title = paste("Zscore for country", country, " and series", indicator),
+             alpha = "Outlier Indicator",
+             x = x.lab,
+             y = "Zscore") -> zscore_plot
 
-    ggplot(.data, aes(x = .data[[attr(x, "time_columns")[1]]], y = Zscore)) +
-      geom_point(aes(color = Imputed, alpha = .data[[.detection_col]]), show.legend=TRUE) +
-      # geom_vline(data = .data_grouped, aes(xintercept = .data[[attr(x, "time_columns")[1]]]), color = "blue", linetype = "dashed") +
-      scale_color_manual(values = c("Imputed" = "red", "Not Imputed" = "black"), drop = FALSE) +
-      # scale_shape_manual(values = c("Imputed" = 1, "Not Imputed" = 16)) +
-      scale_alpha_manual(values = c("Outlier" = 1, "Not Outlier" = 0.2)) +
-      facet_wrap(~ .data[[attr(x, "country_columns")[1]]], scales = "free_y") +
-      labs(title = paste("Zscore for country", country, " and series", indicator),
-           alpha = "Outlier Indicator",
-           color = "Imputation Status",
-           x = x.lab,
-           y = "Zscore") -> zscore_plot
+      # Combine the two plots
+      combined_plot <- original_plot / zscore_plot +
+        plot_layout(guides = "collect") & theme(axis.text = element_text(size = 8),
+                                                legend.position = "bottom",
+                                                legend.direction = "horizontal")
+
+      combined_plot <- combined_plot + plot_annotation(
+        caption =  "No imputed values in series and outliers detected"
+      )
+
+    } else {
+      ggplot(.data, aes(x = .data[[attr(x, "time_columns")[1]]], y = .data[[attr(x, "value_column")]])) +
+        geom_line(alpha = 0.3) +
+        geom_point() +
+        facet_wrap(~ .data[[attr(x, "country_columns")[1]]], scales = "free_y") +
+        guides(alpha = "none") +
+        theme(axis.text = element_text(size = 8), legend.position = "bottom") +
+        labs(title = paste("Original Series for country", country, " and series", indicator),
+             x = x.lab,
+             y = y.lab) -> original_plot
+
+      ggplot(.data, aes(x = .data[[attr(x, "time_columns")[1]]], y = Zscore)) +
+        geom_point() +
+        facet_wrap(~ .data[[attr(x, "country_columns")[1]]], scales = "free_y") +
+        theme(axis.text = element_text(size = 8), legend.position = "bottom") +
+        labs(title = paste("Zscore for country", country, " and series", indicator),
+             x = x.lab,
+             y = "Zscore") -> zscore_plot
+
+      # Combine the two plots
+      combined_plot <- original_plot / zscore_plot +
+        plot_layout(guides = "collect") & theme(axis.text = element_text(size = 8),
+                                                legend.position = "bottom",
+                                                legend.direction = "horizontal")
+
+      combined_plot <- combined_plot + plot_annotation(
+        caption =  "No imputed values in the series and no outliers detected"
+      )
+
+    }
+  } else {
+    if (nrow(.data_grouped) != 0){
+      ggplot(.data, aes(x = .data[[attr(x, "time_columns")[1]]], y = .data[[attr(x, "value_column")]])) +
+        geom_line(alpha = 0.3) +
+        geom_point(aes(color = Imputed, alpha = .data[[.detection_col]]), show.legend=TRUE) +
+        # geom_vline(data = .data_grouped, aes(xintercept = .data[[attr(x, "time_columns")[1]]]), color = "blue", linetype = "dashed") +
+        scale_color_manual(values = c("Imputed" = "red", "Not Imputed" = "black"), drop = FALSE) +
+        # scale_shape_manual(values = c("Imputed" = 1, "Not Imputed" = 16)) +
+        scale_alpha_manual(values = c("Outlier" = 1, "Not Outlier" = 0.2)) +
+        facet_wrap(~ .data[[attr(x, "country_columns")[1]]], scales = "free_y") +
+        guides(alpha = "none") +
+        theme(axis.text = element_text(size = 8), legend.position = "bottom") +
+        labs(title = paste("Original Series for country", country, " and series", indicator),
+             alpha = "Outlier Indicator",
+             color = "Imputation Status",
+             x = x.lab,
+             y = y.lab) -> original_plot
+
+      ggplot(.data, aes(x = .data[[attr(x, "time_columns")[1]]], y = Zscore)) +
+        geom_point(aes(color = Imputed, alpha = .data[[.detection_col]]), show.legend=TRUE) +
+        # geom_vline(data = .data_grouped, aes(xintercept = .data[[attr(x, "time_columns")[1]]]), color = "blue", linetype = "dashed") +
+        scale_color_manual(values = c("Imputed" = "red", "Not Imputed" = "black"), drop = FALSE) +
+        # scale_shape_manual(values = c("Imputed" = 1, "Not Imputed" = 16)) +
+        scale_alpha_manual(values = c("Outlier" = 1, "Not Outlier" = 0.2)) +
+        facet_wrap(~ .data[[attr(x, "country_columns")[1]]], scales = "free_y") +
+        labs(title = paste("Zscore for country", country, " and series", indicator),
+             alpha = "Outlier Indicator",
+             color = "Imputation Status",
+             x = x.lab,
+             y = "Zscore") -> zscore_plot
+
+      # Combine the two plots
+      combined_plot <- original_plot / zscore_plot +
+        plot_layout(guides = "collect") & theme(axis.text = element_text(size = 8),
+                                                legend.position = "bottom",
+                                                legend.direction = "horizontal")
+
+      combined_plot <- combined_plot + plot_annotation(
+        caption = "Imputed values in the series and outliers detected"
+      )
+    } else {
+      ggplot(.data, aes(x = .data[[attr(x, "time_columns")[1]]], y = .data[[attr(x, "value_column")]])) +
+        geom_line(alpha = 0.3) +
+        geom_point(aes(color = Imputed), show.legend=TRUE) +
+        scale_color_manual(values = c("Imputed" = "red", "Not Imputed" = "black"), drop = FALSE) +
+        # scale_shape_manual(values = c("Imputed" = 1, "Not Imputed" = 16)) +
+        facet_wrap(~ .data[[attr(x, "country_columns")[1]]], scales = "free_y") +
+        guides(alpha = "none") +
+        theme(axis.text = element_text(size = 8), legend.position = "bottom") +
+        labs(title = paste("Original Series for country", country, " and series", indicator),
+             color = "Imputation Status",
+             x = x.lab,
+             y = y.lab) -> original_plot
+
+      ggplot(.data, aes(x = .data[[attr(x, "time_columns")[1]]], y = Zscore)) +
+        geom_point(aes(color = Imputed), show.legend=TRUE) +
+        scale_color_manual(values = c("Imputed" = "red", "Not Imputed" = "black"), drop = FALSE) +
+        # scale_shape_manual(values = c("Imputed" = 1, "Not Imputed" = 16)) +
+        facet_wrap(~ .data[[attr(x, "country_columns")[1]]], scales = "free_y") +
+        theme(axis.text = element_text(size = 8), legend.position = "bottom") +
+        labs(title = paste("Zscore for country", country, " and series", indicator),
+             color = "Imputation Status",
+             x = x.lab,
+             y = "Zscore") -> zscore_plot
+
+      # Combine the two plots
+      combined_plot <- original_plot / zscore_plot +
+        plot_layout(guides = "collect") & theme(axis.text = element_text(size = 8),
+                                                legend.position = "bottom",
+                                                legend.direction = "horizontal")
+
+      combined_plot <- combined_plot + plot_annotation(
+        caption = "Imputed values in the series but no outliers detected"
+      )
+    }
   }
-
-
-  # Combine the two plots
-  combined_plot <- original_plot / zscore_plot +
-    plot_layout(guides = "collect") & theme(axis.text = element_text(size = 8),
-                                            legend.position = "bottom",
-                                            legend.direction = "horizontal")
 
   return(combined_plot)
 }

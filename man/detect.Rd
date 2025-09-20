@@ -24,7 +24,7 @@ Options are \code{"zscore"}, \code{"tsoutlier"}, \code{"isotree"}, \code{"outlie
 \code{"zscore"} is the default method, it calculates the Z-score for each observation and identifies outliers
 based on a specified threshold (defaults to 3). \code{"tsoutlier"} uses the IQR method to detect outliers in
 time series data, identifying values that are greater than 3 (default) times the IQR or less than -3 (default)
-times the IQR (one can change this threhold). \code{"isotree"} applies the \code{isotree} algorithm of the
+times the IQR (one can change this threshold). \code{"isotree"} applies the \code{isotree} algorithm of the
 \code{isotree} package to detect outliers. Similarly, \code{"outliertree"} applies the \code{outliertree} algorithm
 of the \code{outliertree} package to detect outliers. Finally, \code{"capa"} applies the \code{capa} method
 of the \code{anomaly} package to detect point and collective anomalies.}
