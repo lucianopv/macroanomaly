@@ -94,7 +94,7 @@ wdi_data_long_subset_normalized |>
   detect(.method = c("tsoutlier", "isotree", "capa"), .args = list(capa = c(.min_seg_len = 3), isotree = c(.threshold = 0.7))) -> wdi_data_long_multiple_methods
 
 # Plot the results for a specific country and indicator
-plot(wdi_data_long_multiple_methods, country = "ECU", indicator = "EG.CFT.ACCS.ZS",.total_threshold = 2,
+plot(wdi_data_long_multiple_methods, country = "RWA", indicator = "EG.CFT.ACCS.ZS",.total_threshold = 2,
      x.lab = "Time", y.lab = "Access to clean fuels for cooking (% of pop.)")
 ```
 
