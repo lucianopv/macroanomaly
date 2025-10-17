@@ -45,12 +45,7 @@ convert_to_tsibble <- function(.data,
     stop("The specified columns do not exist in the data.", call. = FALSE)
   }
 
-  # Check if only one indicator
-  if (length(unique(.data[[.indicator_col]])) > 1) {
-    .keys <- c(.country_col, .indicator_col)
-  } else {
-    .keys <- .country_col
-  }
+  .keys <- c(.country_col, .indicator_col)
 
   # Convert to tsibble
   if (.frequency %in% c("yearly", "year")) {
@@ -193,7 +188,7 @@ check_missing_countries <- function(.data,
   }
 
   # Check if the indicator column exists
-  if (!.indicator_col %in% colnames(.data)) {
+  if (!all(.indicator_col %in% colnames(.data))) {
     stop("The specified indicator column does not exist in the data.", call. = FALSE)
   }
 

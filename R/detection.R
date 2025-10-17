@@ -872,7 +872,9 @@ plot.maly_detect <- function(x, country = NULL, indicator = NULL, .total_thresho
   }
 
   if (is.null(y.lab)) {
-    y.lab <- attr(x, "value_column")
+    # y.lab <- attr(x, "value_column")
+    y.lab.top <- "Obs. value"
+    y.lab.bottom <-  "Z-score"
   }
 
   # Create the plot based on imputation status
@@ -885,10 +887,11 @@ plot.maly_detect <- function(x, country = NULL, indicator = NULL, .total_thresho
         scale_alpha_manual(values = c("Outlier" = 1, "Not Outlier" = 0.2)) +
         facet_wrap(~ .data[[attr(x, "country_columns")[1]]], scales = "free_y") +
         guides(alpha = "none") +
-        labs(title = paste("Original Series for country", country, " and series", indicator),
+        labs(title = paste0(country, " - ", indicator, " - Observation values and Z-scores"),
+             subtitle = indicator,
              alpha = "Outlier Indicator",
              x = x.lab,
-             y = y.lab) -> original_plot
+             y = y.lab.top) -> original_plot
 
       ggplot(.data, aes(x = .data[[attr(x, "time_columns")[1]]], y = Zscore)) +
         geom_point(aes(alpha = .data[[.detection_col]])) +
@@ -896,10 +899,9 @@ plot.maly_detect <- function(x, country = NULL, indicator = NULL, .total_thresho
         scale_alpha_manual(values = c("Outlier" = 1, "Not Outlier" = 0.2)) +
         facet_wrap(~ .data[[attr(x, "country_columns")[1]]], scales = "free_y") +
         theme(axis.text = element_text(size = 8), legend.position = "bottom") +
-        labs(title = paste("Zscore for country", country, " and series", indicator),
-             alpha = "Outlier Indicator",
+        labs(alpha = "Outlier Indicator",
              x = x.lab,
-             y = "Zscore") -> zscore_plot
+             y = y.lab.bottom) -> zscore_plot
 
       # Combine the two plots
       combined_plot <- original_plot / zscore_plot +
@@ -918,17 +920,17 @@ plot.maly_detect <- function(x, country = NULL, indicator = NULL, .total_thresho
         facet_wrap(~ .data[[attr(x, "country_columns")[1]]], scales = "free_y") +
         guides(alpha = "none") +
         theme(axis.text = element_text(size = 8), legend.position = "bottom") +
-        labs(title = paste("Original Series for country", country, " and series", indicator),
+        labs(title = paste0(country, " - ", indicator, " - Observation values and Z-scores"),
+             subtitle = indicator,
              x = x.lab,
-             y = y.lab) -> original_plot
+             y = y.lab.top) -> original_plot
 
       ggplot(.data, aes(x = .data[[attr(x, "time_columns")[1]]], y = Zscore)) +
         geom_point() +
         facet_wrap(~ .data[[attr(x, "country_columns")[1]]], scales = "free_y") +
         theme(axis.text = element_text(size = 8), legend.position = "bottom") +
-        labs(title = paste("Zscore for country", country, " and series", indicator),
-             x = x.lab,
-             y = "Zscore") -> zscore_plot
+        labs(x = x.lab,
+             y = y.lab.bottom) -> zscore_plot
 
       # Combine the two plots
       combined_plot <- original_plot / zscore_plot +
@@ -953,11 +955,12 @@ plot.maly_detect <- function(x, country = NULL, indicator = NULL, .total_thresho
         facet_wrap(~ .data[[attr(x, "country_columns")[1]]], scales = "free_y") +
         guides(alpha = "none") +
         theme(axis.text = element_text(size = 8), legend.position = "bottom") +
-        labs(title = paste("Original Series for country", country, " and series", indicator),
+        labs(title = paste0(country, " - ", indicator, " - Observation values and Z-scores"),
+             subtitle = indicator,
              alpha = "Outlier Indicator",
              color = "Imputation Status",
              x = x.lab,
-             y = y.lab) -> original_plot
+             y = y.lab.top) -> original_plot
 
       ggplot(.data, aes(x = .data[[attr(x, "time_columns")[1]]], y = Zscore)) +
         geom_point(aes(color = Imputed, alpha = .data[[.detection_col]]), show.legend=TRUE) +
@@ -966,11 +969,10 @@ plot.maly_detect <- function(x, country = NULL, indicator = NULL, .total_thresho
         # scale_shape_manual(values = c("Imputed" = 1, "Not Imputed" = 16)) +
         scale_alpha_manual(values = c("Outlier" = 1, "Not Outlier" = 0.2)) +
         facet_wrap(~ .data[[attr(x, "country_columns")[1]]], scales = "free_y") +
-        labs(title = paste("Zscore for country", country, " and series", indicator),
-             alpha = "Outlier Indicator",
+        labs(alpha = "Outlier Indicator",
              color = "Imputation Status",
              x = x.lab,
-             y = "Zscore") -> zscore_plot
+             y = y.lab.bottom) -> zscore_plot
 
       # Combine the two plots
       combined_plot <- original_plot / zscore_plot +
@@ -990,10 +992,11 @@ plot.maly_detect <- function(x, country = NULL, indicator = NULL, .total_thresho
         facet_wrap(~ .data[[attr(x, "country_columns")[1]]], scales = "free_y") +
         guides(alpha = "none") +
         theme(axis.text = element_text(size = 8), legend.position = "bottom") +
-        labs(title = paste("Original Series for country", country, " and series", indicator),
+        labs(title = paste0(country, " - ", indicator, " - Observation values and Z-scores"),
+             subtitle = indicator,
              color = "Imputation Status",
              x = x.lab,
-             y = y.lab) -> original_plot
+             y = y.lab.top) -> original_plot
 
       ggplot(.data, aes(x = .data[[attr(x, "time_columns")[1]]], y = Zscore)) +
         geom_point(aes(color = Imputed), show.legend=TRUE) +
@@ -1001,10 +1004,9 @@ plot.maly_detect <- function(x, country = NULL, indicator = NULL, .total_thresho
         # scale_shape_manual(values = c("Imputed" = 1, "Not Imputed" = 16)) +
         facet_wrap(~ .data[[attr(x, "country_columns")[1]]], scales = "free_y") +
         theme(axis.text = element_text(size = 8), legend.position = "bottom") +
-        labs(title = paste("Zscore for country", country, " and series", indicator),
-             color = "Imputation Status",
+        labs(color = "Imputation Status",
              x = x.lab,
-             y = "Zscore") -> zscore_plot
+             y = y.lab.bottom) -> zscore_plot
 
       # Combine the two plots
       combined_plot <- original_plot / zscore_plot +
