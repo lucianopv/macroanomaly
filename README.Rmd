@@ -115,7 +115,7 @@ wdi_data_long_subset_normalized |>
 plot(wdi_data_long_detected, 
      country = "KHM", 
      indicator = "NY.GDP.MKTP.CN.AD",
-     .total_threshold = 2,
+     .total_threshold = 1,
      x.lab = "Time", 
      y.lab = "Access to clean fuels for cooking (% of pop.)")
 ```
