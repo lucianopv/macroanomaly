@@ -229,7 +229,7 @@ isotree_detection <- function(.data,
                               .threshold = 0.5, ...) {
   # Check if the isotree package is installed
   if (!requireNamespace("isotree", quietly = TRUE)) {
-    stop("The isotree package is required for this function. Please install it.", call. = FALSE)
+    stop("isotree: The isotree package is required for this function. Please install it.", call. = FALSE)
   }
 
   # If .cols is NULL, select columns specified
@@ -292,7 +292,7 @@ isotree_detection <- function(.data,
 outliertree_detection <- function(.data, .cols = NULL, .value_col = NULL, .threshold = 0.5, .save_outliers = TRUE, .nthreads = 2, ...) {
   # Check if the outliertree package is installed
   if (!requireNamespace("outliertree", quietly = TRUE)) {
-    stop("The outliertree package is required for this function. Please install it.", call. = FALSE)
+    stop("outliertree: The outliertree package is required for this function. Please install it.", call. = FALSE)
   }
 
   # Save the order of columns in the original data
@@ -302,13 +302,13 @@ outliertree_detection <- function(.data, .cols = NULL, .value_col = NULL, .thres
   if (!is.null(.cols)){
     # Check if Zscore is included in .cols, if not, add it and warn the user
     if (!"Zscore" %in% .cols) {
-      warning("Zscore column is not included in .cols. It will be added automatically.", call. = FALSE)
+      warning("outliertree: Zscore column is not included in .cols. It will be added automatically.", call. = FALSE)
       .cols <- c(.cols, "Zscore")
     }
 
     # Check if the .value_col is included in .cols, if it is, remove it and warn the user
     if (!is.null(.value_col) && .value_col %in% .cols) {
-      warning(paste("It is not recommended that column", .value_col, "is included in the outlier detection. It will be excluded from the analysis."), call. = FALSE)
+      warning(paste("outliertree: It is not recommended that column", .value_col, "is included in the outlier detection. It will be excluded from the analysis."), call. = FALSE)
       .cols <- .cols[!(.cols %in% .value_col)]
     }
 
@@ -319,11 +319,17 @@ outliertree_detection <- function(.data, .cols = NULL, .value_col = NULL, .thres
     .data <- .data |>
       fselect(.cols)
   } else {
+    # Record the names of the initial columns
+    .cols <- colnames(.data)
+    .original_data <- .data
+
     # Exclude the .value_col if it exists in the data and warn the user
     if (!is.null(.value_col) && .value_col %in% colnames(.data)) {
-      warning(paste("The column", .value_col, "is not included in the outlier detection. It will be excluded from the analysis."), call. = FALSE)
+      warning(paste("outliertree: The column", .value_col, "is not included in the outlier detection. It will be excluded from the analysis."), call. = FALSE)
+      .original_cols <- .cols
+      .cols <- .cols[!.cols %in% .value_col]
       .data <- .data |>
-        fselect(-.value_col)
+        fselect(.cols)
     }
   }
 
@@ -357,10 +363,10 @@ outliertree_detection <- function(.data, .cols = NULL, .value_col = NULL, .thres
   }
 
   # If .cols is not NULL, join the original data with the outlier scores
-  if (!is.null(.cols)) {
+  # if (!is.null(.cols)) {
     # Join the original data with the outlier scores
-    .data <- cbind(.original_data, .data)
-  }
+  .data <- cbind(.original_data, .data)
+  # }
 
   # If the original data was a vctrs_vctr, replace the transformed dates with the original ones
   if (exists(".original_time")) {
@@ -562,27 +568,44 @@ capa_detection <- function(.data,
                            .indicator_col = NULL) {
   # Check if the anomaly package is installed
   if (!requireNamespace("anomaly", quietly = TRUE)) {
-    stop("The anomaly package is required for this function. Please install it.", call. = FALSE)
+    stop("capa: The anomaly package is required for this function. Please install it.", call. = FALSE)
   }
 
   # Check columns exist
   if (!all(c(.country_col, .time_col, .indicator_col) %in% colnames(.data))) {
-    stop("One or more specified columns do not exist in the data frame.", call. = FALSE)
+    stop("capa: One or more specified columns do not exist in the data frame.", call. = FALSE)
   }
 
   # Check if the .type argument is valid
   valid_types <- c("meanvar", "mean", "robustmean")
   if (!.type %in% valid_types) {
-    stop(paste("Invalid type specified. Choose from:", paste(valid_types, collapse = ", ")))
+    stop(paste("capa: Invalid type specified. Choose from:", paste(valid_types, collapse = ", ")))
   }
 
   # Check for missing values, remove them and alert the user
   if (any(is.na(.data$Zscore))) {
-    warning("Missing values found in Zscore column. These will be removed from the analysis.", call. = FALSE)
+    warning("capa: Missing values found in Zscore column. These will be removed from the analysis.", call. = FALSE)
     .data_sub <- .data |> fungroup() |> fsubset(!is.na(Zscore))
   } else {
     .data_sub <- .data
   }
+
+
+  # Check if column names used during the function are already in the data, if so, change them and rename back later
+  if (any(c("location", "start", "end", "start.lag", "end.lag", "variate", "strength") %in% colnames(.data_sub))) {
+    warning("capa: Column names 'location', 'start', 'end', 'start.lag', 'end.lag', 'variate', or 'strength' found in the data frame. These will be temporarily renamed during the analysis.", call. = FALSE)
+    # Identify which columns need to be renamed
+    cols_to_rename <- c("location", "start", "end", "start.lag", "end.lag", "variate", "strength")
+    existing_cols <- cols_to_rename[cols_to_rename %in% colnames(.data_sub)]
+    # Rename the columns by adding "_orig" suffix
+    for (col in existing_cols) {
+      new_col_name <- paste0(col, "_orig")
+      colnames(.data_sub)[colnames(.data_sub) == col] <- new_col_name
+      }
+  }
+
+  # Save columns not included in the grouping variables
+  .other_cols <- colnames(.data_sub)[!colnames(.data_sub) %in% c(.country_col, .time_col, .indicator_col, "Zscore")]
 
   # Group the data by country and indicator
   .grouped_data <- .data_sub |>
@@ -599,7 +622,7 @@ capa_detection <- function(.data,
                             #tryCatch(anomaly::point_anomalies(x),
                             tryCatch(point_anomalies(x),
                                    error = function(e) {
-                                     warning("Error in detecting point anomalies: ", e$message, call. = FALSE)
+                                     warning("capa - Error in detecting point anomalies: ", e$message, call. = FALSE)
                                      return(data.frame(location = NA, variate = NA, strength = NA))
                                    }))
   names(point_anomalies) <- GRPnames(.grouped_data, sep = "._.")
@@ -647,7 +670,26 @@ capa_detection <- function(.data,
             type = ifelse(is.na(type) & !is.na(capa_strength), "point", type )) |>
     fselect(-c(start, end, location, start.lag, end.lag, variate))
 
-  # TODO: What do we want to keep?
+  # Include original columns excluded and reorder columns to have original columns first
+  if (length(.other_cols) > 0) {
+    .data <- .data |>
+      join(.data_sub[, c(.country_col, .time_col, .indicator_col, .other_cols)], on = c(.country_col, .time_col, .indicator_col), verbose = 0, overid = 2)
+  }
+  
+  # Keep new columns (outlier_indicator, capa_strength, type) along with original columns
+  .new_cols <- c("outlier_indicator", "capa_strength", "type")
+  .cols_to_keep <- c(colnames(.data_sub), .new_cols[.new_cols %in% colnames(.data)])
+  .data <- .data[, .cols_to_keep, drop = FALSE]
+
+  # If column names were renamed, rename them back to original
+  if (any(c("location_orig", "start_orig", "end_orig", "start_lag_orig", "end_lag_orig", "variate_orig", "strength_orig") %in% colnames(.data))) {
+    # Rename back to original names, only for those that exist
+    for (col in existing_cols) {
+      new_col_name <- paste0(col, "_orig")
+      colnames(.data)[colnames(.data) == new_col_name] <- col
+    }
+
+  }
 
   return(.data)
 }
@@ -875,7 +917,10 @@ plot.maly_detect <- function(x, country = NULL, indicator = NULL, .total_thresho
     # y.lab <- attr(x, "value_column")
     y.lab.top <- "Obs. value"
     y.lab.bottom <-  "Z-score"
-  }
+  } else {
+    y.lab.top <- y.lab
+    y.lab.bottom <- "Z-score"
+ }
 
   # Create the plot based on imputation status
   if (n_imputed == 0) {

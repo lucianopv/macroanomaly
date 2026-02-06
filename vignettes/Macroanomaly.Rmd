@@ -23,7 +23,7 @@ knitr::opts_chunk$set(
 #| warning: false
 #| message: false
 library(macroanomaly)
-library(imf.data)
+library(imfapi)
 library(collapse)
 ```
 
@@ -56,20 +56,14 @@ wdi_data_long_subset <- read.csv(system.file("extdata", "wdi_data_long_subset.cs
 
 ```{r example_data}
 #| eval: false
-# Load IMF data
-imf.data::load_datasets("CPI")$get_series(freq = "M",
-                                          indicator = "PCPI_IX",
-                                          start_period = "2015-01-01",
-                                          end_period = "2023-12-31") |>
+# Load IMF CPI data using imfapi
+imfapi::imf_get("CPI",
+                dimensions = list(INDICATOR = c("PCPI_IX")),
+                start_period = "2015-M01",
+                end_period = "2023-M12") |>
+  fsubset(FREQUENCY == "M") |>
   fmutate(TIME_PERIOD = lubridate::ym(TIME_PERIOD)) |>
-  pivot(
-    ids = "TIME_PERIOD",
-    how = "longer") |>
-  fmutate(
-    value = as.numeric(value),
-    Country = stringr::str_split_i(variable, "\\.", 2),
-    Frequency = stringr::str_split_i(variable, "\\.", 1),
-    variable = stringr::str_split_i(variable, "\\.", 3)) -> imf_data_long
+  frename(Country = COUNTRY, variable = INDICATOR, value = OBS_VALUE) -> imf_data_long
 
 
 # Load World Bank data
@@ -254,6 +248,97 @@ write_to_csv(imf_data_long_multiple_methods,
 # Save the results to a CSV file with all outliers
 write_to_csv(wdi_data_long_multiple_methods, file = "wdi_data_anomalies.csv")
 ```
+
+## Validation
+
+The detection methods described above may produce false positives, i.e., observations flagged as outliers that are not truly anomalous. To help reduce these false positives, the package provides a `validate` function that applies secondary filtering methods to the detected outliers. Currently, the package supports the Hampel filter for validation, with the possibility of adding more methods in the future.
+
+### The Hampel Filter
+
+The Hampel filter is a method for identifying outliers in time series data. It uses a sliding window approach based on the median absolute deviation (MAD). For each observation, the filter computes the median and MAD within a window of neighboring points. An observation is flagged as an outlier if it deviates from the local median by more than a specified threshold times the MAD.
+The key parameters for the Hampel filter are:
+
+- `.k`: Half-width of the sliding window (default: 5). A window of size `2k + 1` is used.
+- `.t0`: Threshold multiplier for the MAD (default: 5). Higher values are more lenient.
+- `.use_zscore`: Whether to apply the filter to the Z-score column (default: TRUE) or the original values.
+
+### Using the Validate Function
+
+The `validate` function takes a `maly_detect` object (the output from `detect`) and applies the validation method. The validated outliers are those flagged by **both** the detection method and the Hampel filter, reducing the likelihood of false positives. The `maly_validate` will include two additional columns: `hampel_outlier` and `validated_outlier`. The former will inform the user about the Hampel filter's decision, while the latter will indicate whether the observation was flagged by both methods.
+
+```{r validate-wdi}
+# Validate the detected outliers using the Hampel filter
+wdi_data_long_zscore |>
+  validate(.method = "hampel") -> wdi_data_long_validated
+
+# Validate with custom Hampel parameters (stricter threshold)
+wdi_data_long_zscore |>
+  validate(.method = "hampel", 
+           .args = list(hampel = c(.k = 3, .t0 = 3))) -> wdi_data_long_validated_strict
+```
+
+Similar to the `summary` method for detected anomalies, we can get a summary of the validation results. This shows the number of outliers before and after validation, the reduction rate, and information about how many outliers were flagged by each method.
+
+```{r summary-validated}
+# Summary of the validated outliers
+summary(wdi_data_long_validated)
+```
+
+### Plotting Validated Results
+
+The `plot` method for validated data shows different categories of outliers:
+
+- **Validated** (red): Outliers confirmed by both the detection method and Hampel filter
+- **Detected only** (orange): Outliers flagged by the detection method but not by Hampel (potential false positives)
+- **Hampel only** (blue): Outliers flagged by Hampel but not by the detection method
+- **Not outlier** (black, faded): Normal observations
+
+The plot also includes a caption showing the counts for each category, making it easy to understand the validation results at a glance.
+
+```{r plot-validated}
+#| fig.width: 8
+#| fig.height: 8
+# Plot the validated outliers
+plot(wdi_data_long_validated, 
+     country = "SDN", 
+     indicator = "EG.CFT.ACCS.ZS",
+     x.lab = "Year", 
+     y.lab = "Access to clean fuels for cooking (% of pop.)")
+```
+
+If you only want to see validated outliers without the comparison, you can set `show_all_outliers = FALSE`:
+
+```{r plot-validated-simple}
+#| fig.width: 8
+#| fig.height: 8
+# Plot showing only validated outliers
+plot(wdi_data_long_validated, 
+     country = "SDN", 
+     indicator = "EG.CFT.ACCS.ZS",
+     show_all_outliers = FALSE,
+     x.lab = "Year", 
+     y.lab = "Access to clean fuels for cooking (% of pop.)")
+```
+
+### The Complete Pipeline
+
+The full workflow for anomaly detection with validation follows a simple pipeline:
+
+```{r full-pipeline}
+#| eval: false
+# Complete pipeline: normalize -> detect -> validate
+data |>
+  normalize(.value_col = "Value",
+            .country_col = "Country",
+            .indicator_col = "Indicator",
+            .time_col = "Year",
+            .detrend = TRUE,
+            .impute = TRUE) |>
+  detect(.method = "zscore") |>
+  validate(.method = "hampel") -> validated_results
+```
+
+This pipeline ensures that the data is properly preprocessed, anomalies are detected using the chosen method, and then validated to reduce false positives.
 
 ## Conclusion
 
