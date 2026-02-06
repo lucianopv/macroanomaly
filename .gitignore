@@ -11,3 +11,4 @@ data-raw/WDISeries.csv
 inst/doc
 /doc/
 /Meta/
+.DS_Store

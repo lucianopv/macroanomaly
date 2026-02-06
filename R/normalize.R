@@ -49,15 +49,15 @@ convert_to_tsibble <- function(.data,
 
   # Convert to tsibble
   if (.frequency %in% c("yearly", "year")) {
-    .data <- as_tsibble(.data, key = .keys, index = .time_col)
+    .data <- as_tsibble(.data, key = all_of(.keys), index = .time_col)
   } else if (.frequency %in% c("quarterly", "quarter")) {
     .data |>
       fmutate(across(.time_col, tsibble::yearquarter)) |>
-      tsibble::as_tsibble(key = .keys, index = .time_col) -> .data
+      tsibble::as_tsibble(key = all_of(.keys), index = .time_col) -> .data
   } else if (.frequency %in% c("monthly", "month")) {
     .data |>
       fmutate(across(.time_col, tsibble::yearmonth)) |>
-      tsibble::as_tsibble(key = .keys, index = .time_col) -> .data
+      tsibble::as_tsibble(key = all_of(.keys), index = .time_col) -> .data
   } else {
     stop("Invalid frequency. Choose 'yearly', 'quarterly', or 'monthly'.", call. = FALSE)
   }
@@ -168,7 +168,7 @@ impute_missing <- function(.data,
 #' @return A data frame with the countries that do not have enough data for imputation.
 #'
 #' @importFrom collapse fsummarise fgroup_by fsubset frename qDF
-#' @importFrom dplyr n
+#' @importFrom dplyr n all_of
 #' @importFrom tsibble as_tibble
 #' @export
 check_missing_countries <- function(.data,

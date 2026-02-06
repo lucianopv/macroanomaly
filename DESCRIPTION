@@ -29,7 +29,8 @@ Imports:
     stringr
 Suggests: 
     knitr,
-    imf.data,
+    imfapi,
+    pracma,
     rmarkdown,
     testthat (>= 3.0.0)
 VignetteBuilder: knitr

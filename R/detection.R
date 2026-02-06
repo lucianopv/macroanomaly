@@ -673,9 +673,13 @@ capa_detection <- function(.data,
   # Include original columns excluded and reorder columns to have original columns first
   if (length(.other_cols) > 0) {
     .data <- .data |>
-      join(.data_sub[, c(.country_col, .time_col, .indicator_col, .other_cols)], on = c(.country_col, .time_col, .indicator_col), verbose = 0)
+      join(.data_sub[, c(.country_col, .time_col, .indicator_col, .other_cols)], on = c(.country_col, .time_col, .indicator_col), verbose = 0, overid = 2)
   }
-  .data <- .data[, colnames(.data_sub), drop = FALSE]
+  
+  # Keep new columns (outlier_indicator, capa_strength, type) along with original columns
+  .new_cols <- c("outlier_indicator", "capa_strength", "type")
+  .cols_to_keep <- c(colnames(.data_sub), .new_cols[.new_cols %in% colnames(.data)])
+  .data <- .data[, .cols_to_keep, drop = FALSE]
 
   # If column names were renamed, rename them back to original
   if (any(c("location_orig", "start_orig", "end_orig", "start_lag_orig", "end_lag_orig", "variate_orig", "strength_orig") %in% colnames(.data))) {
