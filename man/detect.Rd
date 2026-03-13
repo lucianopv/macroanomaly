@@ -26,8 +26,10 @@ based on a specified threshold (defaults to 3). \code{"tsoutlier"} uses the IQR 
 time series data, identifying values that are greater than 3 (default) times the IQR or less than -3 (default)
 times the IQR (one can change this threshold). \code{"isotree"} applies the \code{isotree} algorithm of the
 \code{isotree} package to detect outliers. Similarly, \code{"outliertree"} applies the \code{outliertree} algorithm
-of the \code{outliertree} package to detect outliers. Finally, \code{"capa"} applies the \code{capa} method
-of the \code{anomaly} package to detect point and collective anomalies.}
+of the \code{outliertree} package to detect outliers. \code{"capa"} applies the \code{capa} method
+of the \code{anomaly} package to detect point and collective anomalies. Finally, \code{"hampel"} applies the
+Hampel filter using \code{pracma::hampel()} to detect outliers based on median absolute deviation within a
+sliding window.}
 
 \item{.country_col}{A character vector specifying the column names for country identifiers. Not needed if these
 are the same as the ones defined for the \code{normalize} function.}
@@ -66,5 +68,10 @@ the \code{.cols} argument. The threshold can be adjusted using the \code{.thresh
 \item \code{"capa"}: Applies the capa method from the anomaly package. The type of anomaly detection can be specified using the
 \code{.type} argument, which can be "robustmean" (default), "mean", or "meanvar". The minimum segment length can be adjusted using the
 \code{.min_seg_len} argument.
+\item \code{"hampel"}: Applies the Hampel filter (via \code{pracma::hampel()}) per country-indicator group sorted by time.
+The window half-width can be adjusted using \code{.k} (default 5) and the MAD threshold using \code{.t0} (default 5).
+By default the filter is applied to the \code{Zscore} column; set \code{.use_zscore = FALSE} to apply to the raw
+value column. An optional trimming step can be enabled with \code{.trim = TRUE}, which un-flags observations that
+fall within \code{.trim_sd} standard deviations (default 1) of the mean of the non-outlier values in the group.
 }
 }

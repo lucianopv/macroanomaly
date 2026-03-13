@@ -96,10 +96,10 @@ test_that("Check capa detection", {
 
   expect_s3_class(imf_detect_capa, "maly_detect")
   expect_true(all(c("Country", "TIME_PERIOD", "variable", "capa_strength", "type") %in% colnames(imf_detect_capa)))
-  
+
   # Check that outlier_indicator == 1 when type is point or collective
   expect_true(all((imf_detect_capa$outlier_indicator == 1) == (imf_detect_capa$type %in% c("collective", "point")), na.rm = TRUE))
-  
+
   # Check that point anomalies have capa_strength, collective anomalies don't
   point_rows <- imf_detect_capa$type == "point" & !is.na(imf_detect_capa$type)
   expect_true(all(!is.na(imf_detect_capa$capa_strength[point_rows])))
@@ -117,8 +117,44 @@ test_that("Check multiple methods detection", {
 
   expect_true(all((abs(imf_detect_all$Zscore) > 3) == imf_detect_all$outlier_indicator_zscore))
   expect_true(all((imf_detect_all$outlier_score_isotree > 0.5) == imf_detect_all$outlier_indicator_isotree))
-  
+
   # Check CAPA outlier_indicator matches type being point or collective
   expect_true(all((imf_detect_all$outlier_indicator_capa == 1) == (imf_detect_all$type_capa %in% c("collective", "point")), na.rm = TRUE))
+
+})
+
+
+test_that("Check hampel detection", {
+
+  # Basic output: class and required columns
+  imf_detect_hampel <- detect(imf_data_long_subset_norm, .method = "hampel")
+
+  expect_s3_class(imf_detect_hampel, "maly_detect")
+  expect_true(all(c("Country", "TIME_PERIOD", "variable", "Zscore", "outlier_indicator") %in%
+                    colnames(imf_detect_hampel)))
+
+  # outlier_indicator must be binary
+  expect_true(all(imf_detect_hampel$outlier_indicator %in% c(0L, 1L)))
+
+  # With additional_cols: hampel_replacements column present
+  imf_detect_hampel_full <- detect(imf_data_long_subset_norm, .method = "hampel",
+                                   .additional_cols = TRUE)
+  expect_true("hampel_replacements" %in% colnames(imf_detect_hampel_full))
+
+  # Custom k and t0 accepted via .args
+  expect_no_error(
+    detect(imf_data_long_subset_norm, .method = "hampel",
+           .args = list(hampel = list(.k = 3, .t0 = 3)))
+  )
+
+  # use_zscore = FALSE: apply to raw value column
+  imf_detect_hampel_val <- detect(imf_data_long_subset_norm, .method = "hampel",
+                                  .args = list(hampel = list(.use_zscore = FALSE)))
+  expect_s3_class(imf_detect_hampel_val, "maly_detect")
+
+  # Multi-method including hampel produces outlier_indicator_total
+  imf_detect_multi <- detect(imf_data_long_subset_norm,
+                             .method = c("zscore", "hampel"))
+  expect_true("outlier_indicator_total" %in% colnames(imf_detect_multi))
 
 })
