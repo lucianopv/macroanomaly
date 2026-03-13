@@ -3,7 +3,8 @@ utils::globalVariables(c("Zscore", "outlier_indicator", "Imputed", "outlier_indi
                       "absZscore", "rankZscore", "IQR", "lower_bound", "upper_bound",
                       "outlier_score", "capa_strength", "location", "type",
                       "strength", "capa_score", "isoforest_score",
-                      "start", "end", "start.lag", "end.lag", "variate"))
+                      "start", "end", "start.lag", "end.lag", "variate",
+                      "hampel_replacements"))
 
 #' Function to apply outlier detection
 #'
@@ -18,8 +19,10 @@ utils::globalVariables(c("Zscore", "outlier_indicator", "Imputed", "outlier_indi
 #' time series data, identifying values that are greater than 3 (default) times the IQR or less than -3 (default)
 #' times the IQR (one can change this threshold). \code{"isotree"} applies the \code{isotree} algorithm of the
 #' \code{isotree} package to detect outliers. Similarly, \code{"outliertree"} applies the \code{outliertree} algorithm
-#' of the \code{outliertree} package to detect outliers. Finally, \code{"capa"} applies the \code{capa} method
-#' of the \code{anomaly} package to detect point and collective anomalies.
+#' of the \code{outliertree} package to detect outliers. \code{"capa"} applies the \code{capa} method
+#' of the \code{anomaly} package to detect point and collective anomalies. Finally, \code{"hampel"} applies the
+#' Hampel filter using \code{pracma::hampel()} to detect outliers based on median absolute deviation within a
+#' sliding window.
 #' @param .country_col A character vector specifying the column names for country identifiers. Not needed if these
 #' are the same as the ones defined for the \code{normalize} function.
 #' @param .time_col A character string specifying the column name for time identifiers.Not needed if these are the
@@ -45,6 +48,11 @@ utils::globalVariables(c("Zscore", "outlier_indicator", "Imputed", "outlier_indi
 #' - \code{"capa"}: Applies the capa method from the anomaly package. The type of anomaly detection can be specified using the
 #'   \code{.type} argument, which can be "robustmean" (default), "mean", or "meanvar". The minimum segment length can be adjusted using the
 #'   \code{.min_seg_len} argument.
+#' - \code{"hampel"}: Applies the Hampel filter (via \code{pracma::hampel()}) per country-indicator group sorted by time.
+#'   The window half-width can be adjusted using \code{.k} (default 5) and the MAD threshold using \code{.t0} (default 5).
+#'   By default the filter is applied to the \code{Zscore} column; set \code{.use_zscore = FALSE} to apply to the raw
+#'   value column. An optional trimming step can be enabled with \code{.trim = TRUE}, which un-flags observations that
+#'   fall within \code{.trim_sd} standard deviations (default 1) of the mean of the non-outlier values in the group.
 #'
 #'
 #'
@@ -69,7 +77,7 @@ detect <- function(.x,
 
 
   # Check if the method is valid
-  valid_methods <- c("zscore", "tsoutlier", "isotree", "outliertree", "capa")
+  valid_methods <- c("zscore", "tsoutlier", "isotree", "outliertree", "capa", "hampel")
   if (!any(.method %in% valid_methods)) {
     stop(paste("Invalid method specified. Choose from:", paste(valid_methods, collapse = ", ")), call. = FALSE)
   }
@@ -106,7 +114,10 @@ detect <- function(.x,
          isotree = doCall(isotree_detection, .data  = .x, args = .args[["isotree"]]),
          outliertree = doCall(outliertree_detection, .data = .x, .value_col = .value_col, args = .args[["outliertree"]]),
          capa = doCall(capa_detection, .data = .x, .country_col = .country_col,
-                       .time_col = .time_col, .indicator_col = .indicator_col, args = .args[["capa"]])
+                       .time_col = .time_col, .indicator_col = .indicator_col, args = .args[["capa"]]),
+         hampel = doCall(hampel_detection, .data = .x, .country_col = .country_col,
+                         .time_col = .time_col, .indicator_col = .indicator_col,
+                         .value_col = .value_col, args = .args[["hampel"]])
     )
 
     # If additional columns are specified, select them
@@ -131,7 +142,10 @@ detect <- function(.x,
                isotree = doCall(isotree_detection, .data = .x, args = .args[["isotree"]]),
                outliertree = doCall(outliertree_detection, .data = .x, args = .args[["outliertree"]]),
                capa = doCall(capa_detection, .data = .x, .country_col = .country_col,
-                             .time_col = .time_col, .indicator_col = .indicator_col, args = .args[["capa"]])
+                             .time_col = .time_col, .indicator_col = .indicator_col, args = .args[["capa"]]),
+               hampel = doCall(hampel_detection, .data = .x, .country_col = .country_col,
+                               .time_col = .time_col, .indicator_col = .indicator_col,
+                               .value_col = .value_col, args = .args[["hampel"]])
         )
       })
 
@@ -561,7 +575,7 @@ point_anomalies <- function(object,epoch=NULL) {
 #' @export
 
 capa_detection <- function(.data,
-                           .type = "robustmean",
+                           .type = "meanvar",
                            .min_seg_len = 2,
                            .country_col = NULL,
                            .time_col = NULL,
@@ -592,16 +606,18 @@ capa_detection <- function(.data,
 
 
   # Check if column names used during the function are already in the data, if so, change them and rename back later
-  if (any(c("location", "start", "end", "start.lag", "end.lag", "variate", "strength") %in% colnames(.data_sub))) {
-    warning("capa: Column names 'location', 'start', 'end', 'start.lag', 'end.lag', 'variate', or 'strength' found in the data frame. These will be temporarily renamed during the analysis.", call. = FALSE)
-    # Identify which columns need to be renamed
-    cols_to_rename <- c("location", "start", "end", "start.lag", "end.lag", "variate", "strength")
-    existing_cols <- cols_to_rename[cols_to_rename %in% colnames(.data_sub)]
+  # Exclude structural columns (country, time, indicator) from renaming as they are needed for grouping
+  .structural_cols <- c(.country_col, .time_col, .indicator_col)
+  .internal_cols <- c("start", "end", "start.lag", "end.lag", "variate", "strength")
+  .internal_cols_non_structural <- .internal_cols[!.internal_cols %in% .structural_cols]
+  if (any(.internal_cols_non_structural %in% colnames(.data_sub))) {
+    warning("capa: Column names 'start', 'end', 'start.lag', 'end.lag', 'variate', or 'strength' found in the data frame. These will be temporarily renamed during the analysis.", call. = FALSE)
+    existing_cols <- .internal_cols_non_structural[.internal_cols_non_structural %in% colnames(.data_sub)]
     # Rename the columns by adding "_orig" suffix
     for (col in existing_cols) {
       new_col_name <- paste0(col, "_orig")
       colnames(.data_sub)[colnames(.data_sub) == col] <- new_col_name
-      }
+    }
   }
 
   # Save columns not included in the grouping variables
@@ -627,6 +643,8 @@ capa_detection <- function(.data,
                                    }))
   names(point_anomalies) <- GRPnames(.grouped_data, sep = "._.")
   point_anomalies <- unlist2d(point_anomalies, idcols = "Indicator")
+  # Rename row-index 'location' to '.capa_row_idx' before cbind to avoid conflict with user's 'location' column
+  names(point_anomalies)[names(point_anomalies) == "location"] <- ".capa_row_idx"
 
   .idx_point_anomalies <- as.data.frame(str_split_fixed(point_anomalies$Indicator, "._.", n = length(c(.country_col, .indicator_col))))
   colnames(.idx_point_anomalies) <- c(.country_col, .indicator_col)
@@ -640,55 +658,160 @@ capa_detection <- function(.data,
   .idx_collective_anomalies <- as.data.frame(str_split_fixed(collective_anomalies$Indicator, "._.", n = length(c(.country_col, .indicator_col))))
   colnames(.idx_collective_anomalies) <- c(.country_col, .indicator_col)
   collective_anomalies <- cbind(.idx_collective_anomalies, collective_anomalies[, -1])  # Remove the Indicator column
-  collective_anomalies <- fmutate(collective_anomalies, location = start)
+  collective_anomalies <- fmutate(collective_anomalies, .capa_row_idx = start)
 
 
   # Combine the results with the original data
   .data <- .data |>
     fungroup() |>
     fgroup_by(c(.country_col, .indicator_col)) |>
-    fmutate(location = 1,
-            location = fcumsum(location),
+    fmutate(.capa_row_idx = 1,
+            .capa_row_idx = fcumsum(.capa_row_idx),
             type = "point") |>
-    join(point_anomalies, on = c(.country_col, .indicator_col, "location"), verbose = 0, overid = 2) |>
+    join(point_anomalies, on = c(.country_col, .indicator_col, ".capa_row_idx"), verbose = 0, overid = 2) |>
     frename(outlier_indicator = variate,
             capa_strength = strength) |>
     fmutate(outlier_indicator = ifelse(is.na(outlier_indicator), 0, outlier_indicator),
             type = ifelse(outlier_indicator == 0, NA, type)) |>
-    fselect(-location)
+    fselect(-.capa_row_idx)
 
   .data <- .data |>
     fungroup() |>
     fgroup_by(c(.country_col, .indicator_col)) |>
-    fmutate(location = 1,
-            location = fcumsum(location)) |>
-    join(collective_anomalies, on = c(.country_col, .indicator_col, "location"), verbose = 0, overid = 2) |>
+    fmutate(.capa_row_idx = 1,
+            .capa_row_idx = fcumsum(.capa_row_idx)) |>
+    join(collective_anomalies, on = c(.country_col, .indicator_col, ".capa_row_idx"), verbose = 0, overid = 2) |>
     fmutate(start = collapse::na_locf(start),
             end = collapse::na_locf(end),
-            outlier_indicator = ifelse(!is.na(start) & !is.na(end) & location >= start & location <= end, 1, outlier_indicator),
-            type = ifelse(location >= start & location <= end, "collective", type),
+            outlier_indicator = ifelse(!is.na(start) & !is.na(end) & .capa_row_idx >= start & .capa_row_idx <= end, 1, outlier_indicator),
+            type = ifelse(.capa_row_idx >= start & .capa_row_idx <= end, "collective", type),
             type = ifelse(is.na(type) & !is.na(capa_strength), "point", type )) |>
-    fselect(-c(start, end, location, start.lag, end.lag, variate))
+    fselect(-c(start, end, .capa_row_idx, start.lag, end.lag, variate))
 
   # Include original columns excluded and reorder columns to have original columns first
   if (length(.other_cols) > 0) {
     .data <- .data |>
       join(.data_sub[, c(.country_col, .time_col, .indicator_col, .other_cols)], on = c(.country_col, .time_col, .indicator_col), verbose = 0, overid = 2)
   }
-  
+
   # Keep new columns (outlier_indicator, capa_strength, type) along with original columns
   .new_cols <- c("outlier_indicator", "capa_strength", "type")
   .cols_to_keep <- c(colnames(.data_sub), .new_cols[.new_cols %in% colnames(.data)])
   .data <- .data[, .cols_to_keep, drop = FALSE]
 
   # If column names were renamed, rename them back to original
-  if (any(c("location_orig", "start_orig", "end_orig", "start_lag_orig", "end_lag_orig", "variate_orig", "strength_orig") %in% colnames(.data))) {
-    # Rename back to original names, only for those that exist
+  if (exists("existing_cols") && length(existing_cols) > 0) {
     for (col in existing_cols) {
       new_col_name <- paste0(col, "_orig")
-      colnames(.data)[colnames(.data) == new_col_name] <- col
+      if (new_col_name %in% colnames(.data)) {
+        colnames(.data)[colnames(.data) == new_col_name] <- col
+      }
     }
+  }
 
+  return(.data)
+}
+
+
+#' Detect outliers using the Hampel filter
+#'
+#' @description Detects outliers in a dataset using the Hampel filter, which identifies
+#' outliers based on median absolute deviation within a sliding window. Applied
+#' per country-indicator group, sorted by time.
+#'
+#' @param .data A data frame of class \code{maly_norm} containing the dataset to be analyzed.
+#' @param .country_col Character vector of country column names.
+#' @param .time_col Character string for time column name.
+#' @param .indicator_col Character vector of indicator column names.
+#' @param .value_col Character string for the raw value column name.
+#' @param .k Integer. Half-width of the sliding window. Default is 5.
+#' @param .t0 Numeric. MAD multiplier threshold for outlier detection. Default is 5.
+#' @param .use_zscore Logical. If \code{TRUE} (default), apply the Hampel filter to the
+#'   \code{Zscore} column. If \code{FALSE}, apply to the original value column.
+#' @param .trim Logical. If \code{TRUE}, applies a secondary false-positive trimming step
+#'   after the Hampel filter: observations flagged by Hampel are un-flagged if they fall
+#'   within \code{mean(non-outliers) ± .trim_sd * sd(non-outliers)} of the group. Default
+#'   is \code{FALSE}.
+#' @param .trim_sd Numeric. Number of standard deviations defining the safe band for the
+#'   trimming step. Only used when \code{.trim = TRUE}. Default is \code{1}.
+#'
+#' @return A data frame with \code{outlier_indicator} (binary 0/1) and
+#'   \code{hampel_replacements} (the Hampel-corrected series) columns added.
+#'
+#' @importFrom collapse fgroup_by roworderv GRP BY fungroup
+#' @importFrom stats sd
+#' @export
+hampel_detection <- function(.data,
+                             .country_col,
+                             .time_col,
+                             .indicator_col,
+                             .value_col,
+                             .k = 5,
+                             .t0 = 5,
+                             .use_zscore = TRUE,
+                             .trim = FALSE,
+                             .trim_sd = 1) {
+
+  if (!requireNamespace("pracma", quietly = TRUE)) {
+    stop("The 'pracma' package is required for the Hampel filter. Please install it.",
+         call. = FALSE)
+  }
+
+  .filter_col <- if (.use_zscore) "Zscore" else .value_col
+
+  # Sort by indicator, country, then time (matching hampel_test.R approach)
+  .order_cols <- c(.indicator_col, .country_col[1], .time_col)
+
+  .data <- .data |>
+    fungroup() |>
+    roworderv(.order_cols)
+
+  .grouped <- .data |>
+    fgroup_by(c(.indicator_col, .country_col[1])) |>
+    GRP()
+
+  hampel_results <- BY(
+    .data[[.filter_col]],
+    .grouped,
+    FUN = function(x) {
+      outlier_flag <- rep(FALSE, length(x))
+      replacements <- x
+      non_na_idx <- which(!is.na(x))
+
+      if (length(non_na_idx) > 2 * .k) {
+        h <- pracma::hampel(x[non_na_idx], k = .k, t0 = .t0)
+        outlier_flag[non_na_idx[h$ind]] <- TRUE
+        replacements[non_na_idx] <- h$y
+      }
+      list(outlier_flag = outlier_flag, replacements = replacements)
+    },
+    return = "list"
+  )
+
+  .data$outlier_indicator <- as.integer(unlist(lapply(hampel_results, `[[`, "outlier_flag")))
+  .data$hampel_replacements <- unlist(lapply(hampel_results, `[[`, "replacements"))
+
+  # Optional trimming step: un-flag Hampel outliers that fall within
+  # mean(non-outliers) ± .trim_sd * sd(non-outliers) of the group
+  if (.trim) {
+    filter_vals  <- .data[[.filter_col]]
+    flag <- as.logical(.data$outlier_indicator)
+
+    for (g in seq_len(.grouped$N.groups)) {
+      idx      <- which(.grouped$group.id == g)
+      vals_g   <- filter_vals[idx]
+      flag_g   <- flag[idx]
+      non_out  <- vals_g[!flag_g & !is.na(vals_g)]
+      if (length(non_out) >= 2) {
+        m    <- mean(non_out)
+        s    <- sd(non_out)
+        safe <- !is.na(vals_g) &
+                vals_g >= (m - .trim_sd * s) &
+                vals_g <= (m + .trim_sd * s)
+        flag[idx] <- flag_g & !safe
+      }
+    }
+    .data$outlier_indicator <- as.integer(flag)
   }
 
   return(.data)
@@ -727,18 +850,16 @@ summary.maly_detect <- function(object, ...) {
   if (length(method) > 1) {
     # Get the number of countries with outliers
     n_countries <- length(unique(object[object$outlier_indicator_total > 0, country_cols[1]]))
-    unique_indicators <- unique(object[object$outlier_indicator_total > 0, indicator_col])
-    n_indicators <- length(unique_indicators[!is.na(unique_indicators)])
-    n_time_periods <- length(unique(object[object$outlier_indicator_total > 0, time_col]))
+    n_indicators <- length(unique(object[object$outlier_indicator_total > 0, indicator_col[1]]))
+    n_time_periods <- length(unique(object[object$outlier_indicator_total > 0, time_col[1]]))
 
     # Get the number of outliers detected
     n_outliers <- sum(object$outlier_indicator_total, na.rm = TRUE)
   } else {
     # Get the number of countries with outliers
     n_countries <- length(unique(object[object$outlier_indicator == 1, country_cols[1]]))
-    unique_indicators <- unique(object[object$outlier_indicator == 1, indicator_col])
-    n_indicators <- length(unique_indicators[!is.na(unique_indicators)])
-    n_time_periods <- length(unique(object[object$outlier_indicator == 1, time_col]))
+    n_indicators <- length(unique(object[object$outlier_indicator == 1, indicator_col[1]]))
+    n_time_periods <- length(unique(object[object$outlier_indicator == 1, time_col[1]]))
 
     # Get the number of outliers detected
     n_outliers <- sum(object$outlier_indicator, na.rm = TRUE)
@@ -775,9 +896,9 @@ summary.maly_detect <- function(object, ...) {
   cat("  Number of countries with outliers:", n_countries, "of a total of" ,
       length(unique(object[[country_cols[1]]])), "countries\n")
   cat("  Number of indicators with outliers:", n_indicators, "of a total of",
-      length(unique(object[[indicator_col]])), "indicators\n")
+      length(unique(object[[indicator_col[1]]])), "indicators\n")
   cat("  Number of time periods with outliers:", n_time_periods, "of a total of",
-      length(unique(object[[time_col]])), "time periods\n")
+      length(unique(object[[time_col[1]]])), "time periods\n")
   cat("  Number of outliers detected:", n_outliers, "\n")
 
   if (n_countries > 0) {

@@ -46,7 +46,7 @@ df_who <- df_who %>%
 df_who |>
   normalize(.value_col= "value",
             .country_col = c("code"),
-            .indicator_col = "indicator",
+            .indicator_col = c("indicator", "indicator_name"),
             .time_col = "year",
             .detrend = TRUE, .impute = TRUE) -> who_normalized
 
@@ -58,7 +58,7 @@ df_who |>
             .detrend = TRUE, .impute = TRUE) -> who_normalized_alt
 
 # Detect anomalies
-who_normalized |>
+who_normalized_alt |>
   detect(.method = c("tsoutlier", "isotree", "capa", "outliertree", "zscore"),
          .args = list(capa = c(.min_seg_len=3), isotree = c(.threshold=0.7),
                       outliertree = list(.cols = c("Zscore", "location", "indicator", "year", "region"))),

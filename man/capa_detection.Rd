@@ -6,7 +6,7 @@
 \usage{
 capa_detection(
   .data,
-  .type = "robustmean",
+  .type = "meanvar",
   .min_seg_len = 2,
   .country_col = NULL,
   .time_col = NULL,
