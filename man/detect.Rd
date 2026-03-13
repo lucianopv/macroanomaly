@@ -70,6 +70,8 @@ the \code{.cols} argument. The threshold can be adjusted using the \code{.thresh
 \code{.min_seg_len} argument.
 \item \code{"hampel"}: Applies the Hampel filter (via \code{pracma::hampel()}) per country-indicator group sorted by time.
 The window half-width can be adjusted using \code{.k} (default 5) and the MAD threshold using \code{.t0} (default 5).
-By default the filter is applied to the \code{Zscore} column; set \code{.use_zscore = FALSE} to apply to the raw value column.
+By default the filter is applied to the \code{Zscore} column; set \code{.use_zscore = FALSE} to apply to the raw
+value column. An optional trimming step can be enabled with \code{.trim = TRUE}, which un-flags observations that
+fall within \code{.trim_sd} standard deviations (default 1) of the mean of the non-outlier values in the group.
 }
 }

@@ -12,7 +12,9 @@ hampel_detection(
   .value_col,
   .k = 5,
   .t0 = 5,
-  .use_zscore = TRUE
+  .use_zscore = TRUE,
+  .trim = FALSE,
+  .trim_sd = 1
 )
 }
 \arguments{
@@ -32,6 +34,14 @@ hampel_detection(
 
 \item{.use_zscore}{Logical. If \code{TRUE} (default), apply the Hampel filter to the
 \code{Zscore} column. If \code{FALSE}, apply to the original value column.}
+
+\item{.trim}{Logical. If \code{TRUE}, applies a secondary false-positive trimming step
+after the Hampel filter: observations flagged by Hampel are un-flagged if they fall
+within \code{mean(non-outliers) ± .trim_sd * sd(non-outliers)} of the group. Default
+is \code{FALSE}.}
+
+\item{.trim_sd}{Numeric. Number of standard deviations defining the safe band for the
+trimming step. Only used when \code{.trim = TRUE}. Default is \code{1}.}
 }
 \value{
 A data frame with \code{outlier_indicator} (binary 0/1) and
